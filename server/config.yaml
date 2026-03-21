@@ -431,6 +431,20 @@ logging:
     backup_count: 5
 
 # ============================================================================
+# Omi External Custom STT Configuration
+# ============================================================================
+# Settings for the /ws/omi WebSocket endpoint used by the Omi wearable device
+# as an external custom STT service.
+# See: docs/omi_external_custom_STT_service_docs.md
+omi_stt:
+    # Enable the /ws/omi endpoint.
+    enabled: true
+
+    # Close the connection after this many seconds with no inbound audio frames.
+    # Omi's server-side idle timeout is 90 seconds; keep this at or below that.
+    inactivity_timeout_s: 90
+
+# ============================================================================
 # Real-time STT Engine Configuration
 # ============================================================================
 # Settings for the real-time speech-to-text engine used for live transcription.

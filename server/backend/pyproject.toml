@@ -67,6 +67,16 @@ nemo = [
 vibevoice_asr = [
     "vibevoice @ git+https://github.com/microsoft/VibeVoice.git@1807b858d4f7dffdd286249a01616c243e488c9e",
 ]
+# Apple Silicon / Metal acceleration (macOS arm64 only)
+# Requires no platform marker — mlx-whisper wheels only exist for macOS arm64 anyway.
+mlx = [
+    "mlx-whisper",
+]
+# OMI External Custom STT support: Opus audio decoding
+# Requires system libopus: brew install opus
+omi = [
+    "opuslib",
+]
 [project.scripts]
 transcription-server = "server.api.main:main"
 

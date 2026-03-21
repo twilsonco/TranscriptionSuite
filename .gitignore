@@ -1,5 +1,9 @@
 # BUILD
 
+# OS
+.DS_Store
+Thumbs.db
+
 ## Internal build outputs
 build/dist/
 build/appimage-kde/
@@ -34,6 +38,10 @@ CLAUDE.md
 AGENTS.md
 .mcp.json
 
+
+# SAMPLES (local test data — not tracked)
+samples/input/
+samples/output/
 
 # MISC
 
