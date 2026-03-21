@@ -93,5 +93,6 @@ url = "https://download.pytorch.org/whl/cu129"
 explicit = true
 
 [tool.uv.sources]
-torch = [{ index = "pytorch-cu129" }]
-torchaudio = [{ index = "pytorch-cu129" }]
+# Linux/Windows: use CUDA 12.9 build; macOS: fall back to PyPI CPU/MPS build
+torch = [{ index = "pytorch-cu129", marker = "sys_platform != 'darwin'" }]
+torchaudio = [{ index = "pytorch-cu129", marker = "sys_platform != 'darwin'" }]
