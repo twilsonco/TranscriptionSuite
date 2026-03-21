@@ -21,6 +21,7 @@ import {
   Users,
   Laptop,
   Radio,
+  Zap,
 } from 'lucide-react';
 import { GlassCard } from '../ui/GlassCard';
 import { Button } from '../ui/Button';
@@ -48,7 +49,9 @@ import {
 } from '../../src/services/modelSelection';
 import { DEFAULT_SERVER_PORT } from '../../src/config/store';
 
-type RuntimeProfile = 'gpu' | 'cpu';
+type RuntimeProfile = 'gpu' | 'cpu' | 'metal';
+
+const MLX_DEFAULT_MODEL = 'mlx-community/whisper-small-mlx';
 
 interface ServerViewProps {
   onStartServer: (
@@ -198,6 +201,14 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
   // Runtime profile (persisted in electron-store)
   const [runtimeProfile, setRuntimeProfile] = useState<RuntimeProfile>('gpu');
 
+  // Metal (Apple Silicon) detection – derived from server-side feature check
+  // API returns features nested under models.features
+  const mlxFeature = (adminStatus?.models as any)?.features?.mlx as { available: boolean; reason: string } | undefined;
+  const metalSupported = mlxFeature?.available ?? false;
+  const [isDarwin] = useState<boolean>(() => {
+    return (window as any).electronAPI?.app?.getPlatform?.() === 'darwin';
+  });
+
   // Auth token display in Instance Settings
   const [showAuthToken, setShowAuthToken] = useState(false);
   const [authTokenCopied, setAuthTokenCopied] = useState(false);
@@ -226,7 +237,7 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
       api.config
         .get('server.runtimeProfile')
         .then((val: unknown) => {
-          if (val === 'gpu' || val === 'cpu') setRuntimeProfile(val);
+          if (val === 'gpu' || val === 'cpu' || val === 'metal') setRuntimeProfile(val);
         })
         .catch(() => {});
       api.config
@@ -246,6 +257,33 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
         .catch(() => {});
     }
   }, [adminStatus]);
+
+  // When Metal becomes available (adminStatus arrives asynchronously), auto-select
+  // Metal if no profile has been stored yet.
+  useEffect(() => {
+    if (!metalSupported) return;
+    const api = (window as any).electronAPI;
+    if (!api?.config) return;
+    api.config
+      .get('server.runtimeProfile')
+      .then((val: unknown) => {
+        if (!val) {
+          handleRuntimeProfileChange('metal');
+          api.config
+            ?.get('server.mainModelSelection')
+            .then((modelVal: unknown) => {
+              const cur = typeof modelVal === 'string' ? modelVal.trim() : '';
+              if (!cur || cur === MODEL_DEFAULT_LOADING_PLACEHOLDER) {
+                setMainModelSelection(MLX_DEFAULT_MODEL);
+                api.config?.set('server.mainModelSelection', MLX_DEFAULT_MODEL);
+                api.config?.set('server.mainCustomModel', '');
+              }
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, [metalSupported]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load persisted model selection UI state once per mount.
   useEffect(() => {
@@ -659,14 +697,31 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
         .then((info: { gpu: boolean; toolkit: boolean }) => {
           cachedGpuInfo = info;
           setGpuInfo(info);
-          // Auto-set runtime profile based on GPU detection (only if not already configured)
+          // Auto-set runtime profile based on hardware detection (only if not already configured).
+          // Priority: Metal (Apple Silicon) > NVIDIA GPU > CPU
           api.config
             ?.get('server.runtimeProfile')
             .then((val: unknown) => {
-              if (!val && info.gpu && info.toolkit) {
-                handleRuntimeProfileChange('gpu');
-              } else if (!val && !info.gpu) {
-                handleRuntimeProfileChange('cpu');
+              if (!val) {
+                if (metalSupported) {
+                  handleRuntimeProfileChange('metal');
+                  // Also default to the small MLX model if no model has been chosen yet
+                  api.config
+                    ?.get('server.mainModelSelection')
+                    .then((modelVal: unknown) => {
+                      const cur = typeof modelVal === 'string' ? modelVal.trim() : '';
+                      if (!cur || cur === MODEL_DEFAULT_LOADING_PLACEHOLDER) {
+                        setMainModelSelection(MLX_DEFAULT_MODEL);
+                        api.config?.set('server.mainModelSelection', MLX_DEFAULT_MODEL);
+                        api.config?.set('server.mainCustomModel', '');
+                      }
+                    })
+                    .catch(() => {});
+                } else if (info.gpu && info.toolkit) {
+                  handleRuntimeProfileChange('gpu');
+                } else {
+                  handleRuntimeProfileChange('cpu');
+                }
               }
             })
             .catch(() => {});
@@ -701,6 +756,22 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
           : 'Run: sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml'
         : 'CPU mode will be used (slower)',
     },
+    ...(isDarwin
+      ? [
+          {
+            label: 'Apple Silicon Metal',
+            ok: metalSupported,
+            warn: !metalSupported,
+            hint: metalSupported
+              ? 'MLX acceleration available'
+              : mlxFeature?.reason === 'not_apple_silicon'
+                ? 'Intel Mac — CPU mode will be used'
+                : mlxFeature?.reason === 'mlx_whisper_not_installed'
+                  ? 'mlx-whisper not installed — run: uv pip install mlx-whisper'
+                  : 'MLX unavailable — CPU mode will be used',
+          },
+        ]
+      : []),
   ];
   const allPassed = setupChecks.every((c) => c.ok);
   const showChecklist = !setupDismissed || !allPassed;
@@ -971,7 +1042,7 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
                   <label className="text-xs font-medium tracking-wider whitespace-nowrap text-slate-500 uppercase">
                     Runtime
                   </label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => handleRuntimeProfileChange('gpu')}
                       disabled={isRunning}
@@ -996,10 +1067,33 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
                       <Cpu size={14} />
                       CPU Only
                     </button>
+                    {isDarwin && (
+                      <button
+                        onClick={() => handleRuntimeProfileChange('metal')}
+                        disabled={isRunning}
+                        title={metalSupported ? 'Apple Silicon Metal — MLX acceleration' : 'Metal requires Apple Silicon (M-series chip)'}
+                        className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
+                          runtimeProfile === 'metal'
+                            ? 'border-violet-400/40 bg-violet-400/15 text-violet-300 shadow-[0_0_10px_rgba(167,139,250,0.15)]'
+                            : metalSupported
+                              ? 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200'
+                              : 'cursor-not-allowed border-white/5 bg-white/[0.02] text-slate-600 opacity-50'
+                        } ${isRunning ? 'cursor-not-allowed opacity-50' : ''}`}
+                        {...(!metalSupported ? { disabled: true } : {})}
+                      >
+                        <Zap size={14} />
+                        Metal (MLX)
+                      </button>
+                    )}
                   </div>
                   {runtimeProfile === 'cpu' && !isRunning && (
                     <span className="text-xs text-slate-500 italic">
                       Slower transcription, no NVIDIA GPU required
+                    </span>
+                  )}
+                  {runtimeProfile === 'metal' && !isRunning && (
+                    <span className="text-xs text-slate-500 italic">
+                      MLX Whisper via Apple Metal — bare-metal macOS only
                     </span>
                   )}
                 </div>
