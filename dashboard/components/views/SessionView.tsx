@@ -19,6 +19,7 @@ import {
   Minus,
   ExternalLink,
   Minimize2,
+  Zap,
 } from 'lucide-react';
 import { GlassCard } from '../ui/GlassCard';
 import { Button } from '../ui/Button';
@@ -58,7 +59,7 @@ interface SessionViewProps {
   setClientRunning: (running: boolean) => void;
   onStartServer: (
     mode: 'local' | 'remote',
-    runtimeProfile: 'gpu' | 'cpu',
+    runtimeProfile: 'gpu' | 'cpu' | 'metal',
     imageTag?: string,
     models?: {
       mainTranscriberModel?: string;
@@ -98,14 +99,14 @@ export const SessionView: React.FC<SessionViewProps> = ({
   const [monitorVolumePct, setMonitorVolumePct] = useState<number | null>(null);
 
   // Runtime profile (read from persisted config)
-  const [runtimeProfile, setRuntimeProfile] = useState<'gpu' | 'cpu'>('gpu');
+  const [runtimeProfile, setRuntimeProfile] = useState<'gpu' | 'cpu' | 'metal'>('gpu');
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (api?.config) {
       api.config
         .get('server.runtimeProfile')
         .then((val: unknown) => {
-          if (val === 'gpu' || val === 'cpu') setRuntimeProfile(val);
+          if (val === 'gpu' || val === 'cpu' || val === 'metal') setRuntimeProfile(val);
         })
         .catch(() => {});
     }
@@ -261,7 +262,9 @@ export const SessionView: React.FC<SessionViewProps> = ({
 
   // Control Center State — real Docker container status
   const docker = useDockerContext();
-  const serverRunning = docker.container.running;
+  const isBareMetal = runtimeProfile === 'metal';
+  // In bare-metal mode there is no Docker container; derive running state from HTTP reachability instead.
+  const serverRunning = isBareMetal ? serverConnection.reachable : docker.container.running;
 
   // serverMode effect — must live after docker/serverRunning are declared
   useEffect(() => {
@@ -1075,15 +1078,19 @@ export const SessionView: React.FC<SessionViewProps> = ({
                       </div>
                       <div className="flex items-center gap-2.5">
                         <span className="text-xs font-medium text-slate-400">
-                          {serverRunning && docker.container.health === 'healthy'
-                            ? 'Docker Container Running'
-                            : serverRunning
-                              ? 'Container Starting\u2026'
-                              : docker.container.exists
-                                ? 'Container Stopped'
-                                : 'Container Missing'}
+                          {isBareMetal
+                            ? serverRunning
+                              ? 'Native Process Running'
+                              : 'Server Offline'
+                            : serverRunning && docker.container.health === 'healthy'
+                              ? 'Docker Container Running'
+                              : serverRunning
+                                ? 'Container Starting\u2026'
+                                : docker.container.exists
+                                  ? 'Container Stopped'
+                                  : 'Container Missing'}
                         </span>
-                        {serverRunning && serverMode && (
+                        {serverRunning && serverMode && !isBareMetal && (
                           <span
                             className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ${serverMode === 'local' ? 'bg-accent-cyan/15 text-accent-cyan' : 'bg-accent-magenta/15 text-accent-magenta'}`}
                           >
@@ -1091,19 +1098,32 @@ export const SessionView: React.FC<SessionViewProps> = ({
                             {serverMode}
                           </span>
                         )}
+                        {isBareMetal && serverRunning && (
+                          <span className="flex items-center gap-1 rounded bg-violet-400/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-violet-300 uppercase">
+                            <Zap size={10} /> Metal
+                          </span>
+                        )}
                         <StatusLight
                           status={
-                            serverRunning && docker.container.health === 'healthy'
-                              ? 'active'
-                              : docker.container.exists
-                                ? 'warning'
-                                : 'inactive'
+                            isBareMetal
+                              ? serverRunning ? 'active' : 'inactive'
+                              : serverRunning && docker.container.health === 'healthy'
+                                ? 'active'
+                                : docker.container.exists
+                                  ? 'warning'
+                                  : 'inactive'
                           }
                           className="h-2 w-2"
                         />
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      {isBareMetal ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-500 italic">
+                          <Zap size={12} className="text-violet-400" />
+                          Bare-metal mode — start the server from the terminal, then connect below.
+                        </div>
+                      ) : (
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="secondary"
@@ -1137,6 +1157,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
                           Stop
                         </Button>
                       </div>
+                      )}
                       <div className="ml-auto shrink-0">
                         <Button
                           variant={showUnloadModelsState ? 'danger' : 'secondary'}
