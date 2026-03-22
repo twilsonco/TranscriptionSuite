@@ -738,16 +738,19 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
   const rtName = docker.runtimeKind ?? 'Docker';
   const gpuSatisfied = gpuInfo?.gpu ?? false;
   const metalSatisfied = metalSupported;
+  const isBareMetal = runtimeProfile === 'metal';
   const setupChecks = [
     {
       label: `${rtName} installed`,
       ok: docker.available,
-      hint: 'Install Docker Engine, Docker Desktop, or Podman',
+      na: isBareMetal,
+      hint: isBareMetal ? 'Not needed — running bare-metal' : 'Install Docker Engine, Docker Desktop, or Podman',
     },
     {
       label: `${rtName} image pulled`,
       ok: docker.images.length > 0,
-      hint: 'Pull an image below to get started',
+      na: isBareMetal,
+      hint: isBareMetal ? 'Not needed — running bare-metal' : 'Pull an image below to get started',
     },
     {
       label: 'NVIDIA GPU detected',
@@ -948,7 +951,38 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
             </div>
           )}
 
-          {/* 1. Image Card */}
+          {/* 1. Image Card — replaced with native instance info in bare-metal mode */}
+          {isBareMetal ? (
+            <div className="relative shrink-0 border-l-2 border-white/10 pb-8 pl-8 last:border-0 last:pb-0">
+              <div className="absolute top-0 -left-4.25 z-10 flex h-8 w-8 items-center justify-center rounded-full border-4 border-slate-900 bg-violet-500/80 text-white shadow-[0_0_15px_rgba(167,139,250,0.4)]">
+                <Zap size={14} />
+              </div>
+              <GlassCard title="1. Native macOS Instance" className="transition-all duration-500 ease-in-out border-violet-400/20">
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3 text-sm text-slate-400">
+                    <Zap size={15} className="mt-0.5 shrink-0 text-violet-400" />
+                    <p>
+                      Running in <span className="text-violet-300 font-medium">bare-metal mode</span> — the server runs as a native macOS process using <span className="text-violet-300 font-medium">MLX / Apple Metal</span> acceleration. No Docker image is required.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3 space-y-2 text-xs font-mono text-slate-400">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Runtime</span>
+                      <span className="text-violet-300">MLX Whisper (Apple Metal)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Containerized</span>
+                      <span className="text-slate-400">No</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Config path</span>
+                      <span className="text-slate-400">~/Library/Application Support/TranscriptionSuite/</span>
+                    </div>
+                  </div>
+                </div>
+              </GlassCard>
+            </div>
+          ) : (
           <div className="relative shrink-0 border-l-2 border-white/10 pb-8 pl-8 last:border-0 last:pb-0">
             <div
               className={`absolute top-0 -left-4.25 z-10 flex h-8 w-8 items-center justify-center rounded-full border-4 border-slate-900 transition-colors duration-300 ${hasImages ? 'bg-accent-cyan text-slate-900 shadow-[0_0_15px_rgba(34,211,238,0.5)]' : 'bg-slate-800 text-slate-300'}`}
@@ -1044,6 +1078,7 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
               )}
             </GlassCard>
           </div>
+          )}
 
           {/* 2. Container Card (Config & Controls) */}
           <div className="relative shrink-0 border-l-2 border-white/10 pb-8 pl-8 last:border-0 last:pb-0">
@@ -1118,6 +1153,12 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
                   )}
                 </div>
 
+                {isBareMetal ? (
+                  <div className="flex items-center gap-3 rounded-lg border border-violet-400/20 bg-violet-400/5 px-4 py-3 text-sm text-slate-400">
+                    <Zap size={15} className="shrink-0 text-violet-400" />
+                    <span>Bare-metal mode — the server runs as a native process. Start it manually via the CLI and connect below.</span>
+                  </div>
+                ) : (
                 <div className="flex flex-wrap items-center gap-5">
                   <div className="flex h-6 shrink-0 items-center space-x-3 border-r border-white/10 pr-5">
                     <StatusLight
@@ -1214,6 +1255,7 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
                     </Button>
                   </div>
                 </div>
+                )}
 
                 {/* Auth Token (read-only) */}
                 {authToken && (
