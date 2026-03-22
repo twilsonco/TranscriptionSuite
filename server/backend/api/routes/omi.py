@@ -124,8 +124,11 @@ async def _transcribe_audio(
     """
     Transcribe *audio* using the loaded model manager engine.
 
-    Tries diarization first (WhisperX path); falls back to plain transcription
-    if diarization is unavailable or raises.
+    Diarization priority:
+      1. Native integrated diarization (WhisperX ``transcribe_with_diarization``).
+      2. Pyannote fallback via ``parallel_diarize`` (works with any backend,
+         e.g. MLX, requires HF_TOKEN).
+      3. Plain transcription without speaker labels.
 
     Returns a list of OMI-format segment dicts.
     """
@@ -134,37 +137,43 @@ async def _transcribe_audio(
     model_manager = get_model_manager()
     engine = model_manager.transcription_engine
 
+    # Resolve HF token — needed for Attempt 1 (native WhisperX diarization).
+    # Attempt 2 (pyannote via parallel_diarize) reads the token from env/config
+    # itself, so no explicit token is required there.
+    import os as _os
+    from server.config import get_config as _get_config
+    _cfg = _get_config()
+    hf_token: str | None = (
+        _os.environ.get("HF_TOKEN", "").strip()
+        or str(_cfg.get("diarization", "hf_token") or "").strip()
+    ) or None
+
     # Write audio to a temporary WAV file (transcribe_file handles resampling)
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         tmp_path = Path(tmp.name)
         sf.write(str(tmp_path), audio, sample_rate)
 
     try:
-        # Attempt diarization if backend supports it
+        # ------------------------------------------------------------------
+        # Attempt 1: Native integrated diarization (WhisperX path)
+        # ------------------------------------------------------------------
         backend = getattr(engine, "_backend", None)
         diarization_result = None
 
-        if backend is not None and hasattr(backend, "transcribe_with_diarization"):
-            hf_token: str | None = None
+        if backend is not None and hf_token and hasattr(backend, "transcribe_with_diarization"):
             try:
-                hf_token = model_manager.hf_token
-            except AttributeError:
-                pass
-
-            if hf_token:
-                try:
-                    diarization_result = await asyncio.to_thread(
-                        backend.transcribe_with_diarization,
-                        audio,
-                        audio_sample_rate=sample_rate,
-                        language=language,
-                        hf_token=hf_token,
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "Diarization failed, falling back to plain transcription: %s", e
-                    )
-                    diarization_result = None
+                diarization_result = await asyncio.to_thread(
+                    backend.transcribe_with_diarization,
+                    audio,
+                    audio_sample_rate=sample_rate,
+                    language=language,
+                    hf_token=hf_token,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Native diarization failed, trying pyannote fallback: %s", e
+                )
+                diarization_result = None
 
         if diarization_result is not None:
             # Map DiarizedTranscriptionResult → OMI segments
@@ -182,7 +191,52 @@ async def _transcribe_audio(
                     segments.append(entry)
             return segments
 
-        # Plain transcription fallback
+        # ------------------------------------------------------------------
+        # Attempt 2: Pyannote diarization fallback (all backends)
+        # The diarization engine reads HF_TOKEN from env/config directly.
+        # ------------------------------------------------------------------
+        try:
+            from server.core.parallel_diarize import (
+                transcribe_and_diarize,
+                transcribe_then_diarize,
+            )
+            from server.core.speaker_merge import build_speaker_segments
+
+            use_parallel = _cfg.get("diarization", "parallel", default=True)
+            diarize_fn = transcribe_and_diarize if use_parallel else transcribe_then_diarize
+
+            result, diar_result = await asyncio.to_thread(
+                diarize_fn,
+                engine=engine,
+                model_manager=model_manager,
+                file_path=str(tmp_path),
+                language=language,
+                word_timestamps=True,
+            )
+            if diar_result is not None:
+                diar_dicts = [seg.to_dict() for seg in diar_result.segments]
+                merged_segments, _, _ = build_speaker_segments(
+                    result.words, diar_dicts
+                )
+                if merged_segments:
+                    return [
+                        {
+                            "text": s.get("text", "").strip(),
+                            "start": round(float(s.get("start", 0.0)), 3),
+                            "end": round(float(s.get("end", 0.0)), 3),
+                            **({"speaker": s["speaker"]} if s.get("speaker") else {}),
+                        }
+                        for s in merged_segments
+                        if s.get("text", "").strip()
+                    ]
+        except Exception as e:
+            logger.warning(
+                "Pyannote diarization fallback failed, returning plain transcript: %s", e
+            )
+
+        # ------------------------------------------------------------------
+        # Fallback: Plain transcription without speaker labels
+        # ------------------------------------------------------------------
         result = await asyncio.to_thread(
             engine.transcribe_file,
             str(tmp_path),
