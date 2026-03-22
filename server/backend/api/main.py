@@ -48,7 +48,7 @@ from server.api.routes import (  # noqa: E402
     auth,
     health,
     live,
-    omi,
+    ws_stt,
     llm,
     notebook,
     openai_audio,
@@ -89,7 +89,8 @@ PUBLIC_ROUTES = {
     "/api/auth/login",
     "/auth",
     "/auth/",
-    "/ws/omi",  # OMI STT: auth is validated inside the handler via query-param token
+    "/ws/stt",  # streaming STT: auth is validated inside the handler via query-param token
+    "/ws/omi",  # backward-compat alias for Omi devices
     "/favicon.ico",
 }
 
@@ -510,7 +511,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     app.include_router(openai_audio.router, prefix="/v1/audio", tags=["OpenAI Compatible"])
     app.include_router(websocket.router, tags=["WebSocket"])
     app.include_router(live.router, tags=["Live Mode"])
-    app.include_router(omi.router, tags=["OMI STT"])
+    app.include_router(ws_stt.router, tags=["WebSocket STT"])
 
     # Exception handler
     @app.exception_handler(Exception)

@@ -400,6 +400,128 @@ class AcceptedResponse(BaseModel):
     job_id: str
 
 
+def save_to_notebook_sync(
+    *,
+    audio_source: "Path | np.ndarray",
+    sample_rate: int = 16000,
+    filename: str,
+    transcription_text: str,
+    duration_seconds: float,
+    segments: "list[dict[str, Any]]",
+    language: str | None = None,
+    transcription_backend: str | None = None,
+    title: str | None = None,
+    recorded_at: "datetime | None" = None,
+) -> int:
+    """
+    Save a transcription result to the Audio Notebook database.
+
+    This is a synchronous function suitable for calling from asyncio.to_thread().
+    It converts the audio to MP3, stores it permanently, and saves the transcription
+    to the database.
+
+    Args:
+        audio_source: Either a Path to an audio/WAV file, or a float32 numpy array
+                      (which will be written to a temp WAV first).
+        sample_rate: Sample rate of numpy audio (ignored when audio_source is a Path).
+        filename: Base filename for the recording (used to derive the stored .mp3 name).
+        transcription_text: Full concatenated transcription text.
+        duration_seconds: Duration of the audio in seconds.
+        segments: List of segment dicts with keys: text, start, end, speaker (optional),
+                  words (optional).  May also include diarization speaker labels.
+        language: BCP-47 language code, or None.
+        transcription_backend: Normalized backend family string (e.g. "mlx_whisper").
+        title: Optional title to store in the database; defaults to filename stem.
+        recorded_at: Timestamp to record for this entry; defaults to now.
+
+    Returns:
+        recording_id (int > 0) on success.
+
+    Raises:
+        RuntimeError: If the database insert fails.
+    """
+    import numpy as _np
+    from server.core.audio_utils import convert_to_mp3
+
+    tmp_wav_path: Path | None = None
+    try:
+        # Resolve source path — create temp WAV when given numpy audio
+        if isinstance(audio_source, _np.ndarray):
+            import soundfile as _sf
+            import tempfile as _tempfile
+
+            with _tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as _tmp:
+                tmp_wav_path = Path(_tmp.name)
+            _sf.write(str(tmp_wav_path), audio_source.astype(_np.float32), sample_rate)
+            src_path = tmp_wav_path
+        else:
+            src_path = audio_source
+
+        # Determine destination directory from config / DATA_DIR env
+        _cfg = get_config()
+        _data_dir = os.environ.get("DATA_DIR", "/data")
+        audio_dir = Path(_cfg.get("audio_notebook", "audio_dir", default=f"{_data_dir}/audio"))
+        audio_dir.mkdir(parents=True, exist_ok=True)
+
+        # Sanitize filename stem to prevent path traversal
+        raw_stem = Path(filename or "recording").stem
+        original_stem = "".join(c for c in raw_stem if c.isalnum() or c in "._- ")[:100]
+        if not original_stem:
+            original_stem = "recording"
+        dest_filename = f"{original_stem}.mp3"
+        dest_path = audio_dir / dest_filename
+
+        # Avoid collisions
+        counter = 2
+        while dest_path.exists():
+            dest_filename = f"{original_stem}-{counter}.mp3"
+            dest_path = audio_dir / dest_filename
+            counter += 1
+
+        convert_to_mp3(str(src_path), str(dest_path))
+
+        # Split segments into diarization_segments (those with speaker labels) and
+        # word_timestamps (flat word list, extracted from segment-level "words" key).
+        has_speaker = any(s.get("speaker") for s in segments)
+        diarization_segs: list[dict[str, Any]] | None = segments if has_speaker else None
+
+        word_timestamps_list: list[dict[str, Any]] | None = None
+        if segments and "words" in segments[0]:
+            word_timestamps_list = []
+            for seg in segments:
+                if "words" in seg:
+                    word_timestamps_list.extend(seg["words"])
+
+        recording_id = save_longform_to_database(
+            audio_path=dest_path,
+            duration_seconds=duration_seconds,
+            transcription_text=transcription_text,
+            word_timestamps=word_timestamps_list,
+            diarization_segments=diarization_segs,
+            recorded_at=recorded_at,
+            title=title or None,
+            transcription_backend=transcription_backend,
+        )
+
+        if not recording_id:
+            raise RuntimeError("Database insert returned no recording_id")
+
+        logger.info(
+            "save_to_notebook_sync: saved recording_id=%d, file=%s, duration=%.1fs",
+            recording_id,
+            dest_path.name,
+            duration_seconds,
+        )
+        return recording_id
+
+    finally:
+        if tmp_wav_path and tmp_wav_path.exists():
+            try:
+                tmp_wav_path.unlink()
+            except OSError:
+                pass
+
+
 def _run_transcription(
     *,
     model_manager: Any,
