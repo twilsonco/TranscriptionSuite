@@ -22,6 +22,7 @@ import {
   Laptop,
   Radio,
   Zap,
+  MinusCircle,
 } from 'lucide-react';
 import { GlassCard } from '../ui/GlassCard';
 import { Button } from '../ui/Button';
@@ -735,6 +736,8 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
 
   // Setup checks
   const rtName = docker.runtimeKind ?? 'Docker';
+  const gpuSatisfied = gpuInfo?.gpu ?? false;
+  const metalSatisfied = metalSupported;
   const setupChecks = [
     {
       label: `${rtName} installed`,
@@ -748,32 +751,39 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
     },
     {
       label: 'NVIDIA GPU detected',
-      ok: gpuInfo?.gpu ?? false,
-      warn: gpuInfo !== null && !gpuInfo.gpu,
-      hint: gpuInfo?.gpu
-        ? gpuInfo.toolkit
+      ok: gpuSatisfied,
+      // Grey out when Metal is active and NVIDIA isn't present — hardware is covered
+      na: !gpuSatisfied && metalSatisfied,
+      warn: gpuInfo !== null && !gpuSatisfied && !metalSatisfied,
+      hint: gpuSatisfied
+        ? gpuInfo?.toolkit
           ? 'nvidia-container-toolkit ready'
           : 'Run: sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml'
-        : 'CPU mode will be used (slower)',
+        : metalSatisfied
+          ? 'Not needed — Metal acceleration active'
+          : 'CPU mode will be used (slower)',
     },
-    ...(isDarwin
-      ? [
-          {
-            label: 'Apple Silicon Metal',
-            ok: metalSupported,
-            warn: !metalSupported,
-            hint: metalSupported
-              ? 'MLX acceleration available'
-              : mlxFeature?.reason === 'not_apple_silicon'
-                ? 'Intel Mac — CPU mode will be used'
-                : mlxFeature?.reason === 'mlx_whisper_not_installed'
-                  ? 'mlx-whisper not installed — run: uv pip install mlx-whisper'
-                  : 'MLX unavailable — CPU mode will be used',
-          },
-        ]
-      : []),
+    {
+      label: 'Apple Silicon Metal',
+      ok: metalSatisfied,
+      // Grey out when NVIDIA is active and Metal isn't present — hardware is covered
+      na: !metalSatisfied && gpuSatisfied,
+      warn: !metalSatisfied && !gpuSatisfied && isDarwin,
+      hint: metalSatisfied
+        ? 'MLX acceleration available'
+        : gpuSatisfied
+          ? 'Not needed — NVIDIA GPU active'
+          : !isDarwin
+            ? 'Not applicable on this platform'
+            : mlxFeature?.reason === 'not_apple_silicon'
+              ? 'Intel Mac — CPU mode will be used'
+              : mlxFeature?.reason === 'mlx_whisper_not_installed'
+                ? 'mlx-whisper not installed — run: uv pip install mlx-whisper'
+                : 'MLX unavailable — CPU mode will be used',
+    },
   ];
-  const allPassed = setupChecks.every((c) => c.ok);
+  // allPassed: na items (greyed-out / covered by the other GPU option) count as passing
+  const allPassed = setupChecks.every((c) => c.ok || c.na);
   const showChecklist = !setupDismissed || !allPassed;
 
   const handleDismissSetup = useCallback(() => {
@@ -912,15 +922,25 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
                     <div key={i} className="flex items-center gap-3">
                       {check.ok ? (
                         <CheckCircle2 size={15} className="shrink-0 text-green-400" />
+                      ) : check.na ? (
+                        <MinusCircle size={15} className="shrink-0 text-slate-600" />
                       ) : check.warn ? (
                         <AlertTriangle size={15} className="text-accent-orange shrink-0" />
                       ) : (
                         <XCircle size={15} className="shrink-0 text-red-400" />
                       )}
-                      <span className={`text-sm ${check.ok ? 'text-slate-300' : 'text-white'}`}>
+                      <span
+                        className={`text-sm ${
+                          check.ok
+                            ? 'text-slate-300'
+                            : check.na
+                              ? 'text-slate-600'
+                              : 'text-white'
+                        }`}
+                      >
                         {check.label}
                       </span>
-                      <span className="ml-auto text-xs text-slate-500">{check.hint}</span>
+                      <span className={`ml-auto text-xs ${check.na ? 'text-slate-700' : 'text-slate-500'}`}>{check.hint}</span>
                     </div>
                   ))}
                 </div>
