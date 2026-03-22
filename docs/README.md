@@ -42,7 +42,7 @@ or CPU mode. Dockerized for fast setup.
 
 **Demo**
 
-https://github.com/user-attachments/assets/f63ee730-de9a-4a55-b0ab-e342b30905a4
+<https://github.com/user-attachments/assets/f63ee730-de9a-4a55-b0ab-e342b30905a4>
 
 </div>
 
@@ -57,7 +57,8 @@ https://github.com/user-attachments/assets/f63ee730-de9a-4a55-b0ab-e342b30905a4
   - [2.2 Download the Dashboard app](#22-download-the-dashboard-app)
     - [2.2.1 Linux AppImage Prerequisites](#221-linux-appimage-prerequisites)
     - [2.2.2 Verify Download with Kleopatra (optional)](#222-verify-download-with-kleopatra-optional)
-  - [2.3 Setting Up the Server](#23-setting-up-the-server)
+  - [2.3 Setting Up the Server (Docker)](#23-setting-up-the-server-docker)
+  - [2.4 macOS Bare-Metal Setup (Apple Silicon)](#24-macos-bare-metal-setup-apple-silicon)
 - [3. Remote Connection](#3-remote-connection)
   - [3.1 Option A: Tailscale (recommended)](#31-option-a-tailscale-recommended)
     - [Server Machine Setup](#server-machine-setup)
@@ -90,7 +91,6 @@ https://github.com/user-attachments/assets/f63ee730-de9a-4a55-b0ab-e342b30905a4
 - **Audio Notebook**: An Audio Notebook mode, with a calendar-based view,
   full-text search, and LM Studio integration (chat with the AI about your notes)
 
-
 📌*Half an hour of audio transcribed in under a minute with Whisper (RTX 3060)!*
 
 **All transcription processing runs entirely on your own computer — your audio never leaves your machine. Internet is only needed to download model weights on first use (STT models, PyAnnote diarization, and wav2vec2 alignment models); all weights are cached locally in a Docker volume and no further internet access is required after that.*
@@ -113,7 +113,7 @@ https://github.com/user-attachments/assets/f63ee730-de9a-4a55-b0ab-e342b30905a4
 
 <div align="center">
 
-https://github.com/user-attachments/assets/688fd4b2-230b-4e2f-bfed-7f92aa769010
+<https://github.com/user-attachments/assets/688fd4b2-230b-4e2f-bfed-7f92aa769010>
 
 </div>
 
@@ -130,49 +130,80 @@ To begin with, you need to install Docker (or Podman).
 **Linux (Docker):**
 
 1. Install Docker Engine
-    * For Arch run `sudo pacman -S --needed docker`
-    * For other distros refer to the [Docker documentation](https://docs.docker.com/engine/install/)
+   - For Arch run `sudo pacman -S --needed docker`
+   - For other distros refer to the [Docker documentation](https://docs.docker.com/engine/install/)
 2. Add your user to the `docker` group so the app can talk to Docker without `sudo`:
+
     ```bash
     sudo usermod -aG docker $USER
     ```
+
     Then **log out and back in** (or reboot) for the change to take effect.
 3. Install NVIDIA Container Toolkit (for GPU mode)
-    * Refer to the [NVIDIA documentation](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
-    * Not required if using CPU mode
+   - Refer to the [NVIDIA documentation](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+   - Not required if using CPU mode
 
 **Linux (Podman):**
 
 1. Install Podman (4.7+ required for `podman compose` support)
-    * For Arch run `sudo pacman -S --needed podman`
-    * For Fedora/RHEL: Podman is pre-installed
-    * For other distros refer to the [Podman documentation](https://podman.io/docs/installation)
+   - For Arch run `sudo pacman -S --needed podman`
+   - For Fedora/RHEL: Podman is pre-installed
+   - For other distros refer to the [Podman documentation](https://podman.io/docs/installation)
 2. For GPU mode, configure CDI (Container Device Interface):
+
     ```bash
     sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
     ```
-    * Requires nvidia-container-toolkit 1.14+
-    * Not required if using CPU mode
+
+   - Requires nvidia-container-toolkit 1.14+
+   - Not required if using CPU mode
 
 **Windows:**
+
 1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) with WSL2 backen (during installation, if presented with the option, make sure the *'Use WSL 2 instead of Hyper-V'* checkbox is enabled).
 After installation to make sure it's enabled, run `wsl --list --verbose` - if the number is 2, Docker is using the WSL 2 backend.
 2. Install NVIDIA GPU driver with WSL support (standard NVIDIA gaming drivers work fine)
-    * Not required if using CPU mode
+   - Not required if using CPU mode
 
 **macOS:**
+
+> **Two server modes are available on macOS. Choose one:**
+
+*Option A — Bare-Metal / Metal (Apple Silicon, recommended):*
+
+1. Install [Homebrew](https://brew.sh/) if not already present
+2. Install Python 3.13 and `uv`:
+
+    ```bash
+    brew install python@3.13
+    brew install uv
+    ```
+
+3. Install FFmpeg (required for audio processing):
+
+    ```bash
+    brew install ffmpeg
+    ```
+
+4. See **[Section 2.4](#24-macos-bare-metal-setup-apple-silicon)** to complete the server setup.
+
+> Metal / MLX acceleration gives ~3 s transcription per minute of audio on M-series chips.
+
+*Option B — Docker / CPU mode:*
+
 1. Install [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) or [Podman Desktop](https://podman-desktop.io/)
-2. GPU mode is not available on macOS — the server runs in CPU mode automatically
+2. GPU acceleration is not available inside Docker on macOS — the server runs in CPU mode
+3. Follow Sections 2.2–2.3 as normal
 
 ### 2.2 Download the Dashboard app
 
 Before doing anything else, you need to download the Dashboard app for your platform from the [Releases](https://github.com/homelab-00/TranscriptionSuite/releases) page.
 This is just the frontend, no models or packages are downloaded yet.
 
->* *Linux and Windows builds are x64; macOS is arm64*
->* *Each release artifact includes an gpg signature by my key (`.sig`)*
+>- *Linux and Windows builds are x64; macOS is arm64*
+>- *Each release artifact includes an gpg signature by my key (`.sig`)*
 
-##### 2.2.1 Linux AppImage Prerequisites
+#### 2.2.1 Linux AppImage Prerequisites
 
 AppImages require **FUSE 2** (`libfuse.so.2`), which is not installed by default on distros that ship with GNOME (both Fedora & Arch KDE worked fine out of the box). If you see `dlopen(): error loading libfuse.so.2`, install the appropriate package:
 
@@ -193,13 +224,15 @@ AppImages require **FUSE 2** (`libfuse.so.2`), which is not installed by default
 1. Download both files from the same release:
    - installer/app (`.AppImage`, `.exe` or `.dmg`)
    - matching signature file (`.sig`)
-2. Install Kleopatra: https://apps.kde.org/kleopatra/
+2. Install Kleopatra: <https://apps.kde.org/kleopatra/>
 3. Import the public key in Kleopatra from this repository:
    - [`docs/assets/homelab-00_0xBFE4CC5D72020691_public.asc`](assets/homelab-00_0xBFE4CC5D72020691_public.asc)
 4. In Kleopatra, use `File` -> `Decrypt/Verify Files...` and select the downloaded `.asc` signature.
 5. If prompted, select the corresponding downloaded app file. Verification should report a valid signature.
 
-### 2.3 Setting Up the Server
+### 2.3 Setting Up the Server (Docker)
+
+> **macOS users:** If you are using the bare-metal/Metal mode, skip this section and go to **[Section 2.4](#24-macos-bare-metal-setup-apple-silicon)**.
 
 We're now ready to start the server. This process includes two parts: downloading the Docker image and starting a Docker container based off of that image.
 
@@ -212,17 +245,129 @@ We're now ready to start the server. This process includes two parts: downloadin
 <br>
 
 Notes:
-* *Settings are saved to:*
-  * *- Linux: `~/.config/TranscriptionSuite/`*
-  * *- Windows: `%APPDATA%\TranscriptionSuite\`*
-  * *- macOS: `~/Library/Application Support/TranscriptionSuite/`*
 
-* *GNOME note: The [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) extension is required for system tray support.*
+- *Settings are saved to (Docker / Electron app):*
+  - *- Linux: `~/.config/TranscriptionSuite/`*
+  - *- Windows: `%APPDATA%\TranscriptionSuite\`*
+  - *- macOS: `~/Library/Application Support/TranscriptionSuite/`*
 
-* *Docker vs Podman:*
+- *GNOME note: The [AppIndicator](https://extensions.gnome.org/extension/615/appindicator-support/) extension is required for system tray support.*
+
+- *Docker vs Podman:*
 *TranscriptionSuite supports both Docker and Podman. The dashboard and CLI scripts auto-detect which runtime is available. For GPU mode with Podman, ensure CDI is configured (`sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`).*
 *Podman 4.7+ is required for `podman compose` support.*
 
+---
+
+### 2.4 macOS Bare-Metal Setup (Apple Silicon)
+
+> Runs the server **natively** on Apple Silicon (M1/M2/M3/M4) with Metal GPU acceleration for both transcription (MLX Whisper) and diarization (PyAnnote via MPS). Skips Docker entirely — no container, no CPU-only limitation.
+>
+> **Prerequisites:** Python 3.13, `uv`, and `ffmpeg` — see [Section 2.1](#21-prerequisites) → *Option A*.
+
+#### Step 1 — Set up the Python environment
+
+```bash
+cd /path/to/TranscriptionSuite/server/backend
+
+# Core install + MLX Whisper (Metal-accelerated transcription)
+uv sync --extra mlx
+
+# Optional: also install Opus support for the Omi WebSocket endpoint
+#   (requires: brew install opus)
+# uv sync --extra mlx --extra omi
+```
+
+#### Step 2 — Prepare data directories
+
+The server creates all required subdirectories automatically on first startup. The paths used by the bare-metal server on macOS are:
+
+| Purpose | Path |
+|---------|------|
+| Database, audio files, tokens, logs | `~/Library/Application Support/TranscriptionSuite/data/` |
+| HuggingFace model weights | `~/Library/Application Support/TranscriptionSuite/models/` |
+| Server user config (optional) | `~/Library/Application Support/TranscriptionSuite/config.yaml` |
+| Dashboard settings | `~/Library/Application Support/TranscriptionSuite/` |
+
+To pre-create them (optional — the server will create them if they don't exist):
+
+```bash
+DATA="$HOME/Library/Application Support/TranscriptionSuite"
+mkdir -p "$DATA/data/database" "$DATA/data/audio" "$DATA/data/logs" \
+         "$DATA/data/tokens" "$DATA/models"
+```
+
+#### Step 3 — (Optional) Customize server config
+
+On macOS the server loads its user config from `~/Library/Application Support/TranscriptionSuite/config.yaml`. Copy the default and edit it to suit your setup:
+
+```bash
+mkdir -p "$HOME/Library/Application Support/TranscriptionSuite"
+cp server/config.yaml "$HOME/Library/Application Support/TranscriptionSuite/config.yaml"
+```
+
+Key settings for bare-metal macOS:
+
+```yaml
+main_transcriber:
+  model: "mlx-community/whisper-large-v3-mlx"  # Metal-accelerated
+
+diarization:
+  device: "auto"   # auto-selects MPS (Metal) on Apple Silicon
+  model: "pyannote/speaker-diarization-community-1"
+  hf_token: null   # or set your HuggingFace token here
+```
+
+#### Step 4 — Start the server
+
+```bash
+cd /path/to/TranscriptionSuite
+
+DATA="$HOME/Library/Application Support/TranscriptionSuite"
+DATA_DIR="$DATA/data" \
+HF_HOME="$DATA/models" \
+HF_TOKEN="hf_..." \
+MAIN_TRANSCRIBER_MODEL="mlx-community/whisper-large-v3-mlx" \
+server/backend/.venv/bin/uvicorn server.api.main:app \
+  --host 0.0.0.0 --port 9786
+```
+
+> **Note:** Set `DATA` as a shell variable first to avoid issues with the space in `Application Support`. Do **not** quote-expand `$HOME` inside the env-var assignment lines themselves — assign `DATA` first, as shown above.
+
+Verify the server is ready:
+
+```bash
+curl -s http://localhost:9786/ready | python3 -m json.tool
+```
+
+A healthy response shows `"loaded": true` with `"backend": "mlx_whisper"` and `"features.mlx.available": true`.
+
+To add debug logging, include these env vars in the startup block:
+
+```bash
+LOG_LEVEL="DEBUG" \
+LOG_DIR="$HOME/Library/Application Support/TranscriptionSuite/data/logs" \
+```
+
+#### Step 5 — Connect the dashboard
+
+1. Download the macOS dashboard app (arm64) from the [Releases](https://github.com/homelab-00/TranscriptionSuite/releases) page, *or* run in dev mode (see [README_DEV.md](README_DEV.md))
+2. Open the dashboard — it should auto-connect to the local server on port 9786
+3. Go to **Settings** → **Runtime Profile** → select **Metal (Apple Silicon)**
+4. Navigate to the **Session** tab and click **Start Local** — the status light should turn green
+
+#### Diarization setup
+
+Speaker diarization uses PyAnnote and runs on Metal (MPS) automatically. You need a HuggingFace token and must accept the [model terms](https://huggingface.co/pyannote/speaker-diarization-community-1):
+
+1. Create a **Read** token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+2. Accept the model terms at the link above
+3. Pass the token via `HF_TOKEN="hf_..."` in the startup command (or set `diarization.hf_token` in your `config.yaml`)
+4. On first use the diarization model (~1 GB) is downloaded and cached to `HF_HOME`
+
+#### For more detail
+
+See **[docs/apple-silicon-metal.md](apple-silicon-metal.md)** for MLX backend notes, Omi WebSocket setup, logging configuration, and curl command examples.
 
 ---
 
@@ -242,7 +387,7 @@ client reaches the server and *where* the TLS certificates come from.
 
 **Architecture overview:**
 
-```
+```text
 ┌─────────────────────────┐         HTTPS (port 9786)        ┌─────────────────────────┐
 │      Server Machine     │◄────────────────────────────────►│      Client Machine     │
 │                         │         + Auth Token             │                         │
@@ -295,6 +440,7 @@ location so the app can find them without config changes:
 `host_key_path` in `config.yaml`.)*
 
 **Linux:**
+
 ```bash
 mkdir -p ~/.config/Tailscale
 mv your-machine.your-tailnet.ts.net.crt ~/.config/Tailscale/my-machine.crt
@@ -304,6 +450,7 @@ chmod 600 ~/.config/Tailscale/my-machine.key
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 mkdir "$env:USERPROFILE\Documents\Tailscale" -Force
 mv your-machine.your-tailnet.ts.net.crt "$env:USERPROFILE\Documents\Tailscale\my-machine.crt"
@@ -311,6 +458,7 @@ mv your-machine.your-tailnet.ts.net.key "$env:USERPROFILE\Documents\Tailscale\my
 ```
 
 For Windows, also update the certificate paths in `config.yaml`:
+
 ```yaml
 remote_server:
   tls:
@@ -322,6 +470,7 @@ remote_server:
 > MagicDNS must be enabled in your Tailnet.
 >
 > **Certificate expiry:** These certificates expire after **90 days**. When they expire the app will attempt to auto-renew via `tailscale cert` before starting the server. If auto-renewal fails, renew manually:
+>
 > ```bash
 > sudo tailscale cert your-machine.your-tailnet.ts.net
 > mv your-machine.your-tailnet.ts.net.crt ~/.config/Tailscale/my-machine.crt
@@ -337,6 +486,7 @@ remote_server:
 
 On the first remote start, an admin **auth token** is generated automatically.
 You can find it in the Server view's "Auth Token" field, or in the container logs:
+
 ```bash
 docker compose logs | grep "Admin Token:"
 ```
@@ -382,7 +532,7 @@ detects the port may be blocked.
 
 > **Tip:** The client machine does *not* need certificates, Docker, or a GPU.
 > It only needs Tailscale running and a valid auth token.
-
+>
 > **Common mistake:** Enter the **full machine hostname** (e.g.,
 > `desktop.tail1234.ts.net`), not just the tailnet name (`tail1234.ts.net`).
 > The Settings modal will warn you if it detects a bare tailnet name without a
@@ -416,6 +566,7 @@ most cases.
 **Step 2 — Start the Server in Remote Mode**
 
 Same as Tailscale above:
+
 1. Open the Dashboard, go to **Server** view, click **Start Remote**
 2. Copy the auth token once the container is healthy
 
@@ -457,11 +608,12 @@ Mounted at `/v1/audio/`. These endpoints follow the [OpenAI Audio API spec](http
 **Auth:** Same rules as all other API routes — Bearer token required in TLS mode; open to localhost in local mode.
 
 **Error shape:** All errors follow the OpenAI error envelope:
+
 ```json
 {"error": {"message": "...", "type": "...", "param": null, "code": null}}
 ```
 
-#### `POST /v1/audio/transcriptions`
+### `POST /v1/audio/transcriptions`
 
 Transcribe an audio or video file. Language auto-detected when `language` is omitted.
 
@@ -497,6 +649,7 @@ Transcribe an audio or video file. Language auto-detected when `language` is omi
 | `500` | `server_error` | Internal engine error |
 
 **Example (curl):**
+
 ```bash
 curl -X POST http://localhost:9786/v1/audio/transcriptions \
   -H "Authorization: Bearer <token>" \
@@ -509,6 +662,7 @@ curl -X POST http://localhost:9786/v1/audio/transcriptions \
 #### `POST /v1/audio/translations`
 
 Transcribe **and translate** an audio or video file to English. Identical to `/transcriptions` except:
+
 - `language` is not accepted (source language is always auto-detected)
 - Translation target is always English
 - The `task` field in `verbose_json` responses is `"translate"` instead of `"transcribe"`
@@ -529,6 +683,7 @@ Transcribe **and translate** an audio or video file to English. Identical to `/t
 > **Backend note:** Translation requires a Whisper-family model with translation capability. Parakeet/Canary backends that don't support `task="translate"` will return a `400` or `500` from the engine layer.
 
 **Example (curl):**
+
 ```bash
 curl -X POST http://localhost:9786/v1/audio/translations \
   -H "Authorization: Bearer <token>" \
@@ -588,6 +743,6 @@ Finally, I want to thank [RealtimeSTT](https://github.com/KoljaB/RealtimeSTT) fo
 
 ### 8.2 Contributing
 
-I'm always open to contributors! Might help me learn a thing or two about programming. 
+I'm always open to contributors! Might help me learn a thing or two about programming.
 
 To follow the progress of issues and planned features, head over to the project's [Blackboard](https://github.com/users/homelab-00/projects/2/views/2). Pick a planned feature to work on or add your own suggestion.

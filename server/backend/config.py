@@ -6,7 +6,8 @@ Provides typed configuration access for all server components.
 
 Configuration Priority (highest to lowest):
     1. User config: ~/.config/TranscriptionSuite/config.yaml (Linux)
-                    or Documents/TranscriptionSuite/config.yaml (Windows)
+                    or ~/Library/Application Support/TranscriptionSuite/config.yaml (macOS)
+                    or ~/Documents/TranscriptionSuite/config.yaml (Windows)
                     or /user-config/config.yaml (Docker with mounted volume)
     2. Default config: /app/config.yaml (Docker container)
     3. Dev config: server/config.yaml (development)
@@ -34,6 +35,7 @@ def get_user_config_dir() -> Path:
     Returns:
         Path to user config directory:
         - Linux: ~/.config/TranscriptionSuite/
+        - macOS: ~/Library/Application Support/TranscriptionSuite/
         - Windows: ~/Documents/TranscriptionSuite/
         - Docker: /user-config/ (if exists and is mounted)
     """
@@ -47,8 +49,11 @@ def get_user_config_dir() -> Path:
         # Windows: Documents/TranscriptionSuite/
         documents = Path.home() / "Documents"
         return documents / "TranscriptionSuite"
+    elif sys.platform == "darwin":
+        # macOS: ~/Library/Application Support/TranscriptionSuite/
+        return Path.home() / "Library" / "Application Support" / "TranscriptionSuite"
     else:
-        # Linux/macOS: ~/.config/TranscriptionSuite/
+        # Linux: ~/.config/TranscriptionSuite/
         xdg_config = os.environ.get("XDG_CONFIG_HOME")
         if xdg_config:
             return Path(xdg_config) / "TranscriptionSuite"
