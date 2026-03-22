@@ -1550,6 +1550,30 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
             <div className="absolute top-0 -left-4.25 z-10 flex h-8 w-8 items-center justify-center rounded-full border-4 border-slate-900 bg-slate-800 text-slate-300">
               <HardDrive size={14} />
             </div>
+            {isBareMetal ? (
+              <GlassCard title="5. Data Directories">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 text-sm text-slate-400">
+                    <HardDrive size={15} className="mt-0.5 shrink-0 text-violet-400" />
+                    <p>Data is stored directly on the filesystem — no Docker volumes are used.</p>
+                  </div>
+                  <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3 space-y-2 text-xs font-mono">
+                    <div className="flex justify-between gap-4">
+                      <span className="text-slate-500 shrink-0">Data</span>
+                      <span className="text-slate-300 break-all text-right">~/Library/Application Support/TranscriptionSuite/data</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-slate-500 shrink-0">Models</span>
+                      <span className="text-slate-300 break-all text-right">~/Library/Application Support/TranscriptionSuite/models</span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-slate-500 shrink-0">Config</span>
+                      <span className="text-slate-300 break-all text-right">~/Library/Application Support/TranscriptionSuite/</span>
+                    </div>
+                  </div>
+                </div>
+              </GlassCard>
+            ) : (
             <GlassCard
               title="5. Persistent Volumes"
               action={
@@ -1617,9 +1641,11 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
                 )}
               </div>
             </GlassCard>
+            )}
           </div>
 
           {/* 6. Clean Up */}
+          {!isBareMetal && (
           <div className="relative shrink-0 border-l-2 border-white/10 pb-2 pl-8 last:border-0 last:pb-0">
             <div className="absolute top-0 -left-4.25 z-10 flex h-8 w-8 items-center justify-center rounded-full border-4 border-slate-900 bg-slate-800 text-slate-300">
               <AlertTriangle size={14} />
@@ -1650,6 +1676,7 @@ export const ServerView: React.FC<ServerViewProps> = ({ onStartServer, startupFl
               </div>
             </GlassCard>
           </div>
+          )}
         </div>
       </div>
       <Dialog
