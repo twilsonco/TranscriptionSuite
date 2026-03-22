@@ -11,7 +11,7 @@ This document covers both the upstream protocol spec and the specifics of this s
 
 ### Endpoint URL
 
-```
+```text
 ws://<host>:9786/ws/omi?token=<api-token>&codec=pcm&sample_rate=16000&language=en
 ```
 
@@ -39,6 +39,7 @@ returns a **single** segments message.
 ### Diarization Behaviour
 
 Diarization runs automatically when `HF_TOKEN` is configured:
+
 1. **WhisperX backend** — uses native integrated diarization (`transcribe_with_diarization`).
 2. **All other backends (including MLX/Metal)** — falls back to pyannote via the same
    parallel-diarize pipeline as the HTTP `/api/transcribe/file` endpoint.

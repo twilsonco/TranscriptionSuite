@@ -48,6 +48,7 @@ returns `"loaded": true` with `"backend": "mlx_whisper"` and `"features.mlx.avai
 In the dashboard the Metal profile can be selected from two places:
 
 **Settings → Server Profile**
+
 1. Open the dashboard (e.g. `npm run dev:electron` from `dashboard/`).
 2. Click the gear ⚙ icon → **Settings**.
 3. Under *Runtime Profile*, select **Metal (Apple Silicon)**.
@@ -55,6 +56,7 @@ In the dashboard the Metal profile can be selected from two places:
 5. Click **Save**. The dashboard stores `runtimeProfile: "metal"` in its config.
 
 **Server View (quick toggle)**
+
 - The Server panel also exposes the profile dropdown so you can switch without opening Settings.
 
 When `metal` is selected, the dashboard starts/restarts the server using the MLX model and bare-metal uvicorn path rather than Docker.
@@ -127,6 +129,7 @@ Results are shown inline and can be exported as `.srt` or `.txt`.
 ### 3c. Dashboard — Audio Notebook
 
 Files can also be sent to the Audio Notebook for storage and later review:
+
 - Enable *Add to Notebook* in the transcription panel, or
 - Set `auto_add_to_audio_notebook: true` in `server/config.yaml`.
 
@@ -134,8 +137,8 @@ Files can also be sent to the Audio Notebook for storage and later review:
 
 ## 4. MLX Backend Notes
 
-- **Model selection**: Any `mlx-community/*` Whisper model works (e.g. `mlx-community/whisper-large-v3-mlx`, `mlx-community/whisper-large-v3-turbo`).  The backend is auto-selected when the model name matches `mlx-community/*`.
-- **Beam search**: MLX Whisper only supports greedy decoding.  If `beam_size > 1` is configured (the default is 5), the backend silently falls back to greedy.  This has no user-visible impact.
+- **Model selection**: Any `mlx-community/*` Whisper model works (e.g. `mlx-community/whisper-large-v3-mlx`, `mlx-community/whisper-large-v3-turbo`). The backend is auto-selected when the model name matches `mlx-community/*`.
+- **Beam search**: MLX Whisper only supports greedy decoding. If `beam_size > 1` is configured (the default is 5), the backend silently falls back to greedy. This has no user-visible impact.
 - **Diarization**: Pyannote diarization works with the MLX backend exactly as with other backends — transcription runs on Metal, diarization runs on CPU (or the device specified in `config.yaml`).
 - **Performance**: ~3 s per minute of audio on an M-series chip with `whisper-large-v3-mlx`.
 
@@ -184,7 +187,7 @@ omi_stt:
   inactivity_timeout_s: 90  # match Omi's server-side idle timeout
 ```
 
-**Authentication**: the `token` query parameter is validated against the server's API token store (same tokens used by the remote web client).  On localhost the token check is bypassed.
+**Authentication**: the `token` query parameter is validated against the server's API token store (same tokens used by the remote web client). On localhost the token check is bypassed.
 
 **Opus dependency** (only needed for Omi's default `opus` codec):
 
