@@ -20,7 +20,7 @@ ws://<host>:9786/ws/omi?token=<api-token>&codec=pcm&sample_rate=16000&language=e
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
 | `token` | Yes* | — | API token from the server's token store. Bypassed on localhost in non-TLS mode. |
-| `codec` | No | `opus` | Audio codec: `pcm` (raw signed 16-bit LE) or `opus` |
+| `codec` | No | `pcm` | Audio codec: `pcm` (raw signed 16-bit LE) or `opus` |
 | `sample_rate` | No | `16000` | Input sample rate in Hz |
 | `language` | No | auto | BCP-47 language code, e.g. `en` |
 

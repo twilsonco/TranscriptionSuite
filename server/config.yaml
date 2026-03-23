@@ -437,11 +437,11 @@ logging:
 # ============================================================================
 # WebSocket STT Configuration
 # ============================================================================
-# Settings for the /ws/omi WebSocket endpoint used by the Omi wearable device
-# and any external client using the Omi External Custom STT protocol.
+# Settings for the /ws/stt WebSocket endpoint (also available at /ws/omi for
+# backward compatibility with Omi devices and other clients).
 # See: docs/omi_external_custom_STT_service_docs.md
 ws_stt:
-    # Enable the /ws/omi endpoint.
+    # Enable the /ws/stt endpoint.
     enabled: true
 
     # Close the connection (and end the conversation) after this many seconds

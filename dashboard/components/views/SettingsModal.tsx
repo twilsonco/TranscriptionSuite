@@ -101,6 +101,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   // Token management state
   const [tokens, setTokens] = useState<AuthToken[]>([]);
   const [tokensLoading, setTokensLoading] = useState(false);
+  const [tokensFetchError, setTokensFetchError] = useState(false);
   const [showTokenPanel, setShowTokenPanel] = useState(false);
   const [newTokenName, setNewTokenName] = useState('');
   const [newTokenAdmin, setNewTokenAdmin] = useState(false);
@@ -1040,14 +1041,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           <div className="mt-2">
             <button
               onClick={async () => {
-                setShowTokenPanel(!showTokenPanel);
-                if (!showTokenPanel && tokens.length === 0) {
+                const opening = !showTokenPanel;
+                setShowTokenPanel(opening);
+                if (opening) {
                   setTokensLoading(true);
+                  setTokensFetchError(false);
                   try {
                     const res = await apiClient.listTokens();
                     setTokens(res.tokens || []);
                   } catch {
-                    /* server may not have TLS enabled */
+                    setTokensFetchError(true);
                   }
                   setTokensLoading(false);
                 }
@@ -1127,7 +1130,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       </div>
                     ) : (
                       <p className="text-xs text-slate-500">
-                        No active tokens. Enable TLS on the server to manage tokens.
+                        {tokensFetchError
+                          ? 'Could not load tokens — is the server running?'
+                          : 'No active tokens yet. Create one below.'}
                       </p>
                     )}
 

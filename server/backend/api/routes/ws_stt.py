@@ -205,7 +205,17 @@ def _make_opus_decoder(sample_rate: int = PCM_SAMPLE_RATE) -> Any:
 
 def _decode_opus_frame(decoder: Any, data: bytes) -> np.ndarray:
     """Decode a single Opus packet and return float32 PCM."""
-    pcm_bytes = decoder.decode(data, frame_size=960)  # 60 ms at 16 kHz
+    # 5760 = max Opus frame (120 ms at 48 kHz) — large enough for any valid packet
+    # regardless of the frame duration the sender chose (20 ms, 40 ms, 60 ms, etc.).
+    try:
+        pcm_bytes = decoder.decode(data, frame_size=5760)
+    except Exception:
+        logger.debug(
+            "_decode_opus_frame: %d-byte frame rejected: first_bytes=%s",
+            len(data),
+            data[:16].hex(),
+        )
+        raise
     pcm = np.frombuffer(pcm_bytes, dtype=np.int16)
     return pcm.astype(np.float32) / 32768.0
 
@@ -539,11 +549,25 @@ async def _flush_pending(
         session.conv_chunks.extend(pending_chunks)
         return
 
+    # Skip silent/noise-only audio — Whisper hallucinate-loops indefinitely on silence
+    rms = float(np.sqrt(np.mean(pending ** 2)))
+    _SILENCE_RMS = 0.005  # ~-46 dBFS; well below any speech
+    if rms < _SILENCE_RMS:
+        logger.debug(
+            "flush_pending[%s]: skipping silent audio (rms=%.5f < %.5f), appending without transcription",
+            session.session_key[:8],
+            rms,
+            _SILENCE_RMS,
+        )
+        session.conv_chunks.extend(pending_chunks)
+        return
+
     logger.info(
-        "flush_pending[%s]: flushing %.1fs pending (conv=%.1fs)",
+        "flush_pending[%s]: flushing %.1fs pending (conv=%.1fs, rms=%.4f)",
         session.session_key[:8],
         pending_dur,
         session.conv_duration_s,
+        rms,
     )
 
     try:
@@ -593,7 +617,7 @@ async def _flush_pending(
 async def ws_stt_endpoint(
     websocket: WebSocket,
     token: str = "",
-    codec: str = "opus",
+    codec: str = "pcm",
     sample_rate: int = PCM_SAMPLE_RATE,
     language: str | None = None,
     save_to_notebook: bool = False,
