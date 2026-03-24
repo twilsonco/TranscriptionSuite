@@ -378,11 +378,49 @@ async def _transcribe_with_context(
     segments that fall within the context region are discarded; only segments
     in the *pending* region are returned.
 
+    For backends that don't produce per-segment timestamps (e.g. Parakeet), the
+    context window is skipped entirely: we transcribe *pending* alone and assign
+    absolute timestamps spanning the pending region.  This avoids:
+      - OOM from building a huge combined audio buffer (context + pending)
+      - Duplicate text being reported for the context region
+
     Returned segment timestamps are **absolute seconds from the conversation
     start**, so they stitch correctly across multiple flush calls and
     reconnections.
     """
+    from server.core.model_manager import get_model_manager as _get_mm
+
     conv_dur = session.conv_duration_s
+    pending_dur = len(pending) / sample_rate
+
+    # Check upfront if the backend provides per-segment timestamps.
+    # No-timestamp backends (e.g. Parakeet) can't benefit from context prepending
+    # because we can't filter the context region by timestamp.  Transcribing pending
+    # alone avoids building a potentially huge combined buffer and prevents OOM.
+    _engine = _get_mm().transcription_engine
+    _backend = getattr(_engine, "_backend", None)
+    _backend_provides_timestamps = getattr(_backend, "provides_timestamps", True)
+
+    if not _backend_provides_timestamps:
+        raw_segments = await _transcribe_audio(pending, sample_rate, session.language)
+        logger.info(
+            "transcribe_with_context[%s]: no-timestamp backend; skipping context window "
+            "(pending=%.1fs, conv_total=%.1fs)",
+            session.session_key[:8],
+            pending_dur,
+            conv_dur,
+        )
+        return [
+            {
+                "text": seg.get("text", "").strip(),
+                "start": round(conv_dur, 3),
+                "end": round(conv_dur + pending_dur, 3),
+                **({"speaker": seg["speaker"]} if seg.get("speaker") else {}),
+            }
+            for seg in raw_segments
+            if seg.get("text", "").strip()
+        ]
+
     context_start = max(0.0, conv_dur - session.context_window_s)
     context_start_frame = int(context_start * sample_rate)
 
@@ -401,14 +439,34 @@ async def _transcribe_with_context(
         "transcribe_with_context[%s]: context=%.1fs, pending=%.1fs, combined=%.1fs, conv_total=%.1fs",
         session.session_key[:8],
         context_dur,
-        len(pending) / sample_rate,
+        pending_dur,
         combined_dur,
         conv_dur,
     )
 
     raw_segments = await _transcribe_audio(combined, sample_rate, session.language)
 
-    # Filter and timestamp-adjust
+    # Safety net: detect if a timestamp-claiming backend still returns all-zero
+    # timestamps (shouldn't happen, but guards against future regressions).
+    no_timestamps = bool(raw_segments) and all(
+        seg.get("start", 0.0) == 0.0 and seg.get("end", 0.0) == 0.0
+        for seg in raw_segments
+    )
+    if no_timestamps:
+        if len(context_audio) > 0:
+            raw_segments = await _transcribe_audio(pending, sample_rate, session.language)
+        return [
+            {
+                "text": seg.get("text", "").strip(),
+                "start": round(conv_dur, 3),
+                "end": round(conv_dur + pending_dur, 3),
+                **({"speaker": seg["speaker"]} if seg.get("speaker") else {}),
+            }
+            for seg in raw_segments
+            if seg.get("text", "").strip()
+        ]
+
+    # Filter and timestamp-adjust (timestamp-capable backends, e.g. WhisperX)
     result: list[dict[str, Any]] = []
     for seg in raw_segments:
         t_start = float(seg.get("start", 0.0))

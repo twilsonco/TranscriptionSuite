@@ -455,11 +455,13 @@ ws_stt:
 
     # Prepend this many seconds of previous conversation audio as context when
     # transcribing each segment (improves quality at segment boundaries).
+    # Note: no-timestamp backends (e.g. Parakeet) skip context prepending entirely.
     context_window_s: 300.0
 
     # Force-flush pending audio when it reaches this duration (prevents very
     # long segments when speech is continuous without pauses).
-    max_segment_s: 300.0
+    # 60s balances quality against memory/latency on CPU-only deployments.
+    max_segment_s: 60.0
 
     # Hard cap on conversation duration (2 hours).
     max_conversation_s: 7200.0

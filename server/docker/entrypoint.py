@@ -266,6 +266,12 @@ def main() -> None:
         "log_level": log_level,
         "access_log": True,
         "reload": False,
+        # Disable WebSocket keepalive pings.  STT inference (especially CPU-only
+        # Parakeet under Rosetta2) can hold the Python GIL long enough to prevent
+        # the event loop from sending pong responses in time, causing spurious
+        # 1011 "keepalive ping timeout" disconnects during long transcriptions.
+        "ws_ping_interval": None,
+        "ws_ping_timeout": None,
     }
 
     # Enable TLS if configured

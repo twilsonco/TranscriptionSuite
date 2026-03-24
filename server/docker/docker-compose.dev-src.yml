@@ -1,0 +1,33 @@
+# Development source-mount overlay
+# ===================================
+# Mounts the local server/backend/ tree into the container at /app/server/,
+# shadowing the baked-in code.  Use this overlay to test branch changes
+# without rebuilding the Docker image.
+#
+# Usage (macOS/Windows — add alongside desktop-vm overlay):
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f docker-compose.desktop-vm.yml \
+#     -f docker-compose.dev-src.yml \
+#     up -d
+#
+# Or restart the existing container with the overlay:
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f docker-compose.desktop-vm.yml \
+#     -f docker-compose.dev-src.yml \
+#     up -d --force-recreate
+#
+# Remove the overlay and recreate to go back to the image's bundled code.
+
+services:
+  transcriptionsuite:
+    volumes:
+      # Mount local server/backend/ over /app/server/ so the running container
+      # uses the current branch's source code instead of the baked-in copy.
+      # The path is relative to this file's directory (server/docker/).
+      - ../../server/backend:/app/server:ro
+      # Mount local config.yaml so ws_stt and other new config sections are visible.
+      - ../../server/config.yaml:/app/config.yaml:ro
+      # Mount local entrypoint.py so dev-time uvicorn config changes take effect.
+      - ./entrypoint.py:/app/docker/entrypoint.py:ro

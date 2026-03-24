@@ -452,9 +452,15 @@ class ParakeetBackend(STTBackend):
     def backend_name(self) -> str:
         return "parakeet"
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    @property
+    def provides_timestamps(self) -> bool:
+        """Parakeet returns segment-level timestamps only when word_timestamps=True
+        is requested AND the model was asked for alignment data; the default batch
+        transcription path returns start=0.0/end=0.0 for each segment.  Mark as
+        False so callers that need reliable per-segment start/end times (e.g. the
+        streaming WebSocket context-window filter) know to skip context prepending."""
+        return False
+
 
     def _transcribe_array(
         self,
