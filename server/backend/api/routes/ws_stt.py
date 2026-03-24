@@ -13,6 +13,8 @@ Query params:
   sample_rate       - Input sample rate in Hz (default: 16000)
   language          - BCP-47 language code, e.g. "en" (optional; auto-detect if omitted)
   save_to_notebook  - "true"/"1" to save final high-quality transcript to Audio Notebook
+  speaker_labels    - "true"/"1" to run diarization after CloseStream and deliver
+                      speaker-attributed segments in a second final message
 
 Protocol:
   Client → Server: binary audio frames  OR  JSON {"type": "CloseStream"}
@@ -103,6 +105,7 @@ class WsAudioSession:
 
     # Flags set by first-connection-wins
     save_to_notebook: bool = False
+    speaker_labels: bool = False
     language: str | None = None
 
     # Background notebook save task handle
@@ -264,6 +267,7 @@ async def _transcribe_audio(
             hf_token: str | None = (
                 _os.environ.get("HF_TOKEN", "").strip()
                 or str(_cfg.get("diarization", "hf_token") or "").strip()
+                or str(_cfg.get("server", "hfToken") or "").strip()
             ) or None
 
             # --- Attempt 1: Native integrated diarization (e.g. WhisperX) ---
@@ -679,6 +683,7 @@ async def ws_stt_endpoint(
     sample_rate: int = PCM_SAMPLE_RATE,
     language: str | None = None,
     save_to_notebook: bool = False,
+    speaker_labels: bool = False,
 ) -> None:
     """
     Streaming STT WebSocket endpoint (compatible with Omi External Custom STT protocol).
@@ -691,8 +696,14 @@ async def ws_stt_endpoint(
     re-transcribed at high quality and saved to the Audio Notebook when the
     conversation ends.
 
+    When speaker_labels=true, diarization is run on the full conversation audio
+    after CloseStream.  A second final message (is_partial=false,
+    diarization_complete=true) is sent with speaker-attributed segments.
+    Requires HF_TOKEN (or diarization.hf_token / server.hfToken in config).
+
     Connect:
       ws://<host>:9786/ws/stt?token=<api-token>&codec=pcm&save_to_notebook=true
+      ws://<host>:9786/ws/stt?token=<api-token>&codec=pcm&speaker_labels=true
     """
     await websocket.accept()
 
@@ -807,13 +818,15 @@ async def ws_stt_endpoint(
         session.max_segment_s = max_segment_s
         session.max_conv_s = max_conv_s
         session.save_to_notebook = save_to_notebook
+        session.speaker_labels = speaker_labels
         session.language = language
         _ws_sessions[skey] = session
         logger.info(
             "ws_stt[%s]: new conversation started "
-            "(save_to_notebook=%s, language=%s, inactivity=%.0fs, segment_silence=%.1fs)",
+            "(save_to_notebook=%s, speaker_labels=%s, language=%s, inactivity=%.0fs, segment_silence=%.1fs)",
             skey[:8],
             save_to_notebook,
+            speaker_labels,
             language or "auto",
             inactivity_s,
             segment_silence_s,
@@ -939,6 +952,47 @@ async def ws_stt_endpoint(
             await websocket.send_json(
                 {"segments": session.streamed_segments, "is_partial": False}
             )
+
+            # If client requested speaker labels, run diarization on full conversation
+            # and send a second final message with speaker-attributed segments.
+            if (
+                session.speaker_labels
+                and session.conv_chunks
+                and websocket.client_state == WebSocketState.CONNECTED
+            ):
+                logger.info(
+                    "ws_stt[%s]: running post-stream diarization (%.1fs of audio)",
+                    skey[:8],
+                    session.conv_duration_s,
+                )
+                try:
+                    diarized = await _transcribe_audio(
+                        session.conv_audio(), sample_rate, session.language,
+                        enable_diarization=True,
+                    )
+                    has_speakers = any(s.get("speaker") for s in diarized)
+                    if has_speakers and websocket.client_state == WebSocketState.CONNECTED:
+                        await websocket.send_json(
+                            {
+                                "segments": diarized,
+                                "is_partial": False,
+                                "diarization_complete": True,
+                            }
+                        )
+                        logger.info(
+                            "ws_stt[%s]: diarization complete → sent %d speaker-labelled segments",
+                            skey[:8],
+                            len(diarized),
+                        )
+                    else:
+                        logger.info(
+                            "ws_stt[%s]: diarization ran but produced no speaker labels",
+                            skey[:8],
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        "ws_stt[%s]: post-stream diarization failed: %s", skey[:8], exc
+                    )
 
         # Schedule notebook save if the conversation is ending
         should_save = (

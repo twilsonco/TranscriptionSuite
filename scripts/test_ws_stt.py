@@ -128,6 +128,7 @@ async def stream_audio(
     save_to_notebook: bool,
     chunk_delay: float,
     graceful_close: bool = True,
+    speaker_labels: bool = False,
 ) -> list[dict]:
     """
     Open a single WebSocket connection, stream *pcm_bytes* in chunks, and
@@ -140,6 +141,8 @@ async def stream_audio(
         uri += f"&language={language}"
     if save_to_notebook:
         uri += "&save_to_notebook=true"
+    if speaker_labels:
+        uri += "&speaker_labels=true"
 
     print(f"    Connecting  : {server_url}/ws/stt")
 
@@ -220,6 +223,7 @@ async def test_file(
     save_to_notebook: bool,
     chunk_delay: float,
     stitch_test: bool,
+    speaker_labels: bool = False,
 ) -> bool:
     """Run the test for a single audio file.  Returns True on pass."""
     if not path.exists():
@@ -242,11 +246,13 @@ async def test_file(
             return await _run_stitch_test(
                 path, pcm_bytes, duration, token, server_url,
                 language, save_to_notebook, chunk_delay, ts,
+                speaker_labels=speaker_labels,
             )
         else:
             return await _run_single_test(
                 path, pcm_bytes, token, server_url,
                 language, save_to_notebook, chunk_delay, ts,
+                speaker_labels=speaker_labels,
             )
     except Exception as exc:
         print(f"    ✗  Error: {exc}\n")
@@ -262,9 +268,11 @@ async def _run_single_test(
     save_to_notebook: bool,
     chunk_delay: float,
     ts: str,
+    speaker_labels: bool = False,
 ) -> bool:
     responses = await stream_audio(
         pcm_bytes, token, server_url, language, save_to_notebook, chunk_delay,
+        speaker_labels=speaker_labels,
     )
     if not responses:
         print("    ✗  No responses received\n")
@@ -281,7 +289,14 @@ async def _run_single_test(
         print(f'    ↳ First: "{segments[0].get("text", "")[:90]}"')
         print(f'    ↳ Last : "{segments[-1].get("text", "")[:90]}"')
         has_speaker = any("speaker" in s for s in segments)
-        print(f"    ↳ Diarization: {'yes ✓' if has_speaker else 'no (HF_TOKEN missing or unsupported backend)'}")
+        has_diarization_response = any(r.get("diarization_complete") for r in responses)
+        if has_speaker:
+            speaker_set = {s.get("speaker") for s in segments if s.get("speaker")}
+            print(f"    ↳ Diarization: yes ✓ ({len(speaker_set)} speaker(s): {', '.join(sorted(speaker_set))})")
+        elif has_diarization_response:
+            print(f"    ↳ Diarization: ran but no speaker labels produced (check logs)")
+        else:
+            print(f"    ↳ Diarization: no (use --speaker-labels to request, or --save-to-notebook for async)")
     if save_to_notebook:
         queued = any(r.get("notebook_save_queued") for r in responses)
         print(f"    ↳ Notebook save: {'queued (check logs)' if queued else 'will run after inactivity timeout'}")
@@ -316,6 +331,7 @@ async def _run_stitch_test(
     save_to_notebook: bool,
     chunk_delay: float,
     ts: str,
+    speaker_labels: bool = False,
 ) -> bool:
     """
     Stitch test: send the first half as one connection, reconnect immediately
@@ -331,7 +347,7 @@ async def _run_stitch_test(
     responses_a = await stream_audio(
         pcm_bytes[:half],
         token, server_url, language, save_to_notebook, chunk_delay,
-        graceful_close=False,
+        graceful_close=False, speaker_labels=speaker_labels,
     )
     print("    [stitch-test] First half done.  Reconnecting immediately …")
 
@@ -339,7 +355,7 @@ async def _run_stitch_test(
     responses_b = await stream_audio(
         pcm_bytes[half:],
         token, server_url, language, save_to_notebook, chunk_delay,
-        graceful_close=True,
+        graceful_close=True, speaker_labels=speaker_labels,
     )
     print("    [stitch-test] Second half done.")
 
@@ -397,6 +413,7 @@ async def run(
     save_to_notebook: bool,
     chunk_delay: float,
     stitch_test: bool,
+    speaker_labels: bool = False,
 ) -> None:
     token = get_admin_token()
     print(f"Token : {token[:4]}…{token[-4:]}")
@@ -404,6 +421,8 @@ async def run(
     print(f"Files : {[p.name for p in files]}")
     if save_to_notebook:
         print("Notebook save: enabled (save_to_notebook=true)")
+    if speaker_labels:
+        print("Speaker labels: enabled (speaker_labels=true — diarization runs after CloseStream)")
     if stitch_test:
         print("Stitch test: enabled (two connections per file)")
     print()
@@ -414,6 +433,7 @@ async def run(
     for path in files:
         ok = await test_file(
             path, token, server_url, language, save_to_notebook, chunk_delay, stitch_test,
+            speaker_labels=speaker_labels,
         )
         if ok:
             passed += 1
@@ -436,6 +456,7 @@ def main() -> None:
             "  python scripts/test_ws_stt.py file1.wav file2.wav\n"
             "  python scripts/test_ws_stt.py --dir /path/to/audio/files\n"
             "  python scripts/test_ws_stt.py --save-to-notebook samples/input/1min_test.wav\n"
+            "  python scripts/test_ws_stt.py --speaker-labels samples/input/1min_test.wav\n"
             "  python scripts/test_ws_stt.py --stitch-test samples/input/1min_test.wav\n"
             "  python scripts/test_ws_stt.py --server ws://10.0.1.90:9786 --language en\n"
         ),
@@ -460,6 +481,13 @@ def main() -> None:
         "--save-to-notebook",
         action="store_true",
         help="Set save_to_notebook=true on the connection (saves final transcript to notebook)",
+    )
+    parser.add_argument(
+        "--speaker-labels",
+        action="store_true",
+        help="Request speaker diarization after CloseStream (speaker_labels=true). "
+             "Diarization runs on the full conversation audio and the server sends a "
+             "second final message with speaker-labelled segments. Requires HF_TOKEN.",
     )
     parser.add_argument(
         "--chunk-delay",
@@ -505,6 +533,7 @@ def main() -> None:
             save_to_notebook=args.save_to_notebook,
             chunk_delay=args.chunk_delay,
             stitch_test=args.stitch_test,
+            speaker_labels=args.speaker_labels,
         )
     )
 

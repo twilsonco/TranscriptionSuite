@@ -119,6 +119,7 @@ async def process_file(
     server_url: str,
     language: str | None,
     receive_timeout: float,
+    speaker_labels: bool = False,
 ) -> list[dict]:
     """
     Stream audio to /ws/omi as PCM, collect all response messages, and return them.
@@ -135,6 +136,8 @@ async def process_file(
     uri = f"{server_url}/ws/omi?token={token}&codec=pcm&sample_rate={TARGET_SAMPLE_RATE}"
     if language:
         uri += f"&language={language}"
+    if speaker_labels:
+        uri += "&speaker_labels=true"
 
     print(f"    Connecting  : {server_url}/ws/omi")
 
@@ -183,18 +186,15 @@ async def process_file(
     return responses
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-
-async def run(files: list[Path], server_url: str, language: str | None) -> None:
+async def run(files: list[Path], server_url: str, language: str | None, speaker_labels: bool = False) -> None:
     SAMPLES_OUTPUT.mkdir(parents=True, exist_ok=True)
 
     token = get_admin_token()
     print(f"Token : {token[:8]}…{token[-6:]}")
     print(f"Server: {server_url}")
     print(f"Files : {[p.name for p in files]}")
+    if speaker_labels:
+        print("Speaker labels: enabled (speaker_labels=true — diarization runs after CloseStream)")
     print()
 
     passed = 0
@@ -211,6 +211,7 @@ async def run(files: list[Path], server_url: str, language: str | None) -> None:
         print(f"[{path.name}]")
 
         # Dynamic receive timeout: 10× real-time, minimum 120 s, max 900 s
+        # When speaker_labels=True, allow extra time for diarization (up to 30min per hour of audio)
         try:
             audio_info = sf.info(str(path))
             estimated_duration = audio_info.duration
@@ -218,13 +219,15 @@ async def run(files: list[Path], server_url: str, language: str | None) -> None:
             estimated_duration = 600.0
 
         receive_timeout = max(120.0, min(estimated_duration * 10, 900.0))
+        if speaker_labels:
+            receive_timeout = max(receive_timeout, estimated_duration * 30, 600.0)
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         out_name = f"{path.stem}_{ts}.json"
         out_path = SAMPLES_OUTPUT / out_name
 
         try:
-            responses = await process_file(path, token, server_url, language, receive_timeout)
+            responses = await process_file(path, token, server_url, language, receive_timeout, speaker_labels=speaker_labels)
         except Exception as exc:
             print(f"    ✗  Error: {exc}\n")
             failed += 1
@@ -259,7 +262,14 @@ async def run(files: list[Path], server_url: str, language: str | None) -> None:
             first_text = segments[0].get("text", "").strip()
             print(f'    ↳ First : "{first_text[:90]}"')
             has_speaker = any("speaker" in s for s in segments)
-            print(f"    ↳ Diarization: {'yes' if has_speaker else 'no (token missing or unsupported backend)'}")
+            has_diarization_response = any(r.get("diarization_complete") for r in responses)
+            if has_speaker:
+                speaker_set = {s.get("speaker") for s in segments if s.get("speaker")}
+                print(f"    ↳ Diarization: yes ✓ ({len(speaker_set)} speaker(s): {', '.join(sorted(speaker_set))})")
+            elif has_diarization_response:
+                print(f"    ↳ Diarization: ran but no speaker labels produced (check logs)")
+            else:
+                print(f"    ↳ Diarization: no (use --speaker-labels to request, or --save-to-notebook for async)")
 
         output = {
             "source_file": path.name,
@@ -285,6 +295,7 @@ def main() -> None:
             "Examples:\n"
             "  python scripts/test_omi_websocket.py\n"
             "  python scripts/test_omi_websocket.py samples/input/1min_test.wav\n"
+            "  python scripts/test_omi_websocket.py --speaker-labels samples/input/1min_test.wav\n"
             "  python scripts/test_omi_websocket.py --dir /path/to/audio/files\n"
             "  python scripts/test_omi_websocket.py --server ws://10.0.1.90:9786 --language en\n"
         ),
@@ -304,6 +315,13 @@ def main() -> None:
         default=None,
         metavar="LANG",
         help="BCP-47 language code, e.g. 'en'. Default: auto-detect.",
+    )
+    parser.add_argument(
+        "--speaker-labels",
+        action="store_true",
+        help="Request speaker diarization after CloseStream (speaker_labels=true). "
+             "Diarization runs on full conversation audio and the server sends a "
+             "second final message with speaker-labelled segments. Requires HF_TOKEN.",
     )
     parser.add_argument(
         "--dir",
@@ -328,7 +346,7 @@ def main() -> None:
             print("Copy sample files there first, or pass file paths as arguments.")
             sys.exit(1)
 
-    asyncio.run(run(paths, args.server, args.language))
+    asyncio.run(run(paths, args.server, args.language, speaker_labels=args.speaker_labels))
 
 
 if __name__ == "__main__":
