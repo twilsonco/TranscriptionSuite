@@ -5,7 +5,7 @@ and optional Audio Notebook saving.
 Compatible with the Omi External Custom STT protocol:
   https://docs.omi.me/developer/backend/custom-stt
 
-Endpoint: /ws/omi  (URL kept for backward compatibility with Omi devices)
+Endpoint: /ws/stt
 
 Query params:
   token             - API token for authentication (required unless local loopback)
@@ -675,7 +675,6 @@ async def _flush_pending(
 
 
 @router.websocket("/ws/stt")
-@router.websocket("/ws/omi")  # backward-compat alias for Omi devices
 async def ws_stt_endpoint(
     websocket: WebSocket,
     token: str = "",
@@ -702,6 +701,7 @@ async def ws_stt_endpoint(
     Requires HF_TOKEN (or diarization.hf_token / server.hfToken in config).
 
     Connect:
+      ws://<host>:9786/ws/stt?token=<api-token>&codec=pcm
       ws://<host>:9786/ws/stt?token=<api-token>&codec=pcm&save_to_notebook=true
       ws://<host>:9786/ws/stt?token=<api-token>&codec=pcm&speaker_labels=true
     """

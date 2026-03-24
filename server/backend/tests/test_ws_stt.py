@@ -413,19 +413,6 @@ class TestWsSttLocalMode:
             assert _is_authorized(None, "127.0.0.1") is True
             assert _is_authorized("", "127.0.0.1") is True
 
-    def test_omi_alias_works(self, ws_client_local):
-        """/ws/omi should behave identically to /ws/stt."""
-        token = ws_client_local.user_token
-        with ws_client_local.websocket_connect(f"/ws/omi?token={token}") as ws:
-            ws.send_text(json.dumps({"type": "CloseStream"}))
-            msgs = []
-            try:
-                while True:
-                    msgs.append(ws.receive_json())
-            except Exception:
-                pass
-            assert not any(m.get("error") == "Unauthorized" for m in msgs)
-
 
 class TestWsSttModelNotLoaded:
     def test_returns_service_unavailable_when_model_not_loaded(self, ws_client_no_model):

@@ -1,0 +1,165 @@
+{
+  "source_file": "13-31-31-10min.converted.wav",
+  "processed_at": "20260324_123848",
+  "server": "ws://127.0.0.1:9786",
+  "language_hint": null,
+  "messages_received": 11,
+  "segment_count": 10,
+  "responses": [
+    {
+      "segments": [
+        {
+          "text": "Uh I was kind of like wanting to observe that with the proper grade boundary. Okay. To see if um we had like one um steep increase and then a decrease in the energy versus cluster size curve, right? With the copper bismuth for just the copper. For just the copper, yes. So I was uh looking for specifically the first neighbor and second neighbor bonds and the difference between uh how they overlap uh when the cluster size increases from like 30 to 40 for that uh first increase and uh 60 to 70 for that dip. Yes. And so that that 60 to 70 happens when you're starting to form second neighbor ponds. Right. And the 30 to 40 happens when you're starting to form first neighbor pawns. Right, right. And I wanted to see if there was a difference with the bismuth, or what the difference was with with the bismuth segregated to the center.",
+          "start": 0.0,
+          "end": 60.0
+        }
+      ],
+      "is_partial": true
+    },
+    {
+      "segments": [
+        {
+          "text": "And so with the bismuth there, that dip happens at 30 to 40. Yeah. Yeah. And there's not the corresponding one. Yeah. So the presumption is that it's all due to first neighbor bodies. Yes, yes. So that's the presumption. So what have you looked at? Yes. How are you getting at this? Yes, so I looked at the uh similar Albertal overlap analysis that I did for the PSS and the USS solutes in the grain boundary. And what I found was there is there is no second neighbor bonding at all with the bismuth in the center. Whatever And how did you conclude that? So I was just looking for uh bismuth overlap with the corresponding copper atoms in the cluster. Okay. And when there's copper there you find it, when there's bismuth there you don't. Yes. Okay. And there is a lot.",
+          "start": 60.0,
+          "end": 120.0
+        }
+      ],
+      "is_partial": true
+    },
+    {
+      "segments": [
+        {
+          "text": "More anti-bonding orientation with the bismuth than with the copper. So the only sort of first neighbor bonds that are found are between like the 5 or 6s of the bismuth orbital and uh the corresponding D orbitals of copper. Okay. And they were just very, very few. Okay. So that's sort of what the conclusion that I have after sort of looking at this from the orbital overlap perspective. Okay. Because what we were seeing was the essentially the closing of the octahedral hole. If you're further over towards like bias towards the FCC side, you see that increase of kinetic energy, or you see that increase of kinetic energy because you have contributions from heavily Sigma antibonding EGs coming down below the Fermi level and being populated, then. Say that again. So when you when you close the",
+          "start": 120.0,
+          "end": 180.0
+        }
+      ],
+      "is_partial": true
+    },
+    {
+      "segments": [
+        {
+          "text": "octahedral hole in something that's towards the BCC side, you aren't filling any states, you aren't filling very many states that are anti-bonding, especially anti-bonding that are across that octahedral hole. But once you start getting to HCP and especially the FCCs, you start feeling a lot of states that are heavily antibonding with respect to the octahedral hole. And so that's that was like when we see the spike happening as soon as you complete that octahedral hole that we were associating with the filling of those specific states. So this is all kind of consistent with the things that that were we were guessing before. But now you say I've got specific things I can show pictures I can make this case. Yes. Okay so let's let's look at the other things that we were working on and I'll come back",
+          "start": 180.0,
+          "end": 240.0
+        }
+      ],
+      "is_partial": true
+    },
+    {
+      "segments": [
+        {
+          "text": "to the things you're working on. So the iron uh BCC iron calculation with band. Right. So is that finished? Yes, that is finished. Get the right moment. Again, I don't know how to find the magnetic moment value from band. So I submitted an SUM support request and uh waiting for them to get back to me. But in the meantime I ran a BAST calculation just for the BCC iron unit cell to see what if that converges the correct moments and it gave me about 2.2 board magnetons. And I'm also thinking I'll probably do like an energy versus lattice constant. After relaxing the uh available lattice constant from uh you know literature I could also do an energy versus uh lattice constant to see if that indeed is the minimum value with VASP. And what's that for? What do you care?",
+          "start": 240.0,
+          "end": 300.0
+        }
+      ],
+      "is_partial": true
+    },
+    {
+      "segments": [
+        {
+          "text": "Just to ensure that that's the lowest energy uh corresponding to that lattice constant. And again, why do you care? What what was the purpose of doing the valve calculation? Just to see if it would converge uh to the right magnetic moment. I mean we assume it'll converge to the right magnetic moment. There was another purpose to the valve calculation. To compare it with uh the band and ADS calculations. Compare what? The uh density distribution or the gradient bundle. Have you done the gradient bundles? No, I have not done the gradient bundles yet. For either iron, for either band or for bass? Yes. Okay. So now, legal, why is it taking us so long to get gradient bundles done on these? Oh, I I was just ensuring that uh we we get the right the right values and then get.",
+          "start": 300.0,
+          "end": 360.0
+        }
+      ],
+      "is_partial": true
+    },
+    {
+      "segments": [
+        {
+          "text": "But I mean the purpose of these calculations was to simply see if if if we got the same topology for the gradient bundle decomposition. Right, right, right. I mean we've been waiting for more than a year for a gradient bundle decomposition for any any system. I mean the only ones that we've done at this point are you've got some preliminary ones with boron and phosphorus in a um in a small cluster, but we have nothing else. Right. Why is it taking us so long? No, I'll I'll I'll get them done. I'm I'm almost there. I'll I'll get them done. I mean now the you you really need to get on these because this is this is what you're bringing to this. This the gradient bundle decompositions are going to provide insight as to whether you've got this second neighbor bonding robot, and so and you don't have that much time left. You really need to be moving forward on those.",
+          "start": 360.0,
+          "end": 420.0
+        }
+      ],
+      "is_partial": true
+    },
+    {
+      "segments": [
+        {
+          "text": "Okay. And the only purpose for the VASP calculations was just to look at it and say, are we seeing the same gradient bundle decomposition? Sitting and doing a VASP relaxation, it's going to relax to a different. So you're using the lattice concept for the VASP calculation you got from what? From experiment or from uh from literature. Yes. So just like the Van calculation gave you a 2% different result, so too the VAT calculation will give you a 2 or 3 different percent, whether it be larger or smaller, I don't know, but it won't be the same. But so what? And you you got you got a good magnetic moment, 2.2. Right. So you really have to move forward on these things. Okay, so now let's let's talk about your stuff. So you've got a paper coming up that's due in May. So tell me what your thoughts are on that. So my thoughts are Malvika and I also, when we discussed the orbitals, we discussed what would make the most sense.",
+          "start": 420.0,
+          "end": 480.0
+        }
+      ],
+      "is_partial": true
+    },
+    {
+      "segments": [
+        {
+          "text": "As far as the figure, because that's been something I've been thinking about as far as showing. And so I've also talked with Tim a little bit about doing this, and I'm starting making the figures where we can actually see, especially it the results that are the most interesting to me so far, that you can see the biggest trend, is with the EGs on the central atom, how those split into the uh larger bands as we move up in cluster size. Explain that to me. So, like I was saying with the results we were talking about with hers, you see um, say for niobium, you're only filling bands with sigma bonding character with respect to the nearest neighbor interactions, and you're getting very little interaction across the octahedral hole versus transition over to uh FCC, and you see really strong or you see filling of",
+          "start": 480.0,
+          "end": 540.0
+        }
+      ],
+      "is_partial": true
+    },
+    {
+      "segments": [
+        {
+          "text": "Very strongly anti-bonding orbitals that are above the Fermi level, but they're as you add more and more shells, portions of that keep dipping below the Fermi level as you get bigger. So showing these orbitals and specifically showing the octahedral hole itself and kind of having the nuclear critical points, maybe the bond paths, to frame the octahedral hole, and then showing the different orbitals in the octahedral hole itself, and then splitting that into bands just as a color map, and then showing the Fermi level as it progresses across the Siri. Okay. So we can start making arguments about okay, we're starting to fill these states in the band, we're starting to fill these states in the band. This is why we see a transition in structure. Now I would be shocked if somebody has not done something similar from just straight band calculations. Okay. So they take band calculations and they're going to have a uh",
+          "start": 540.0,
+          "end": 600.0
+        }
+      ],
+      "is_partial": true
+    },
+    {
+      "segments": [
+        {
+          "text": "Uh I was kind of like wanting to observe that with the proper grade boundary. Okay. To see if um we had like one um steep increase and then a decrease in the energy versus cluster size curve, right? With the copper bismuth for just the copper. For just the copper, yes. So I was uh looking for specifically the first neighbor and second neighbor bonds and the difference between uh how they overlap uh when the cluster size increases from like 30 to 40 for that uh first increase and uh 60 to 70 for that dip. Yes. And so that that 60 to 70 happens when you're starting to form second neighbor ponds. Right. And the 30 to 40 happens when you're starting to form first neighbor pawns. Right, right. And I wanted to see if there was a difference with the bismuth, or what the difference was with with the bismuth segregated to the center.",
+          "start": 0.0,
+          "end": 60.0
+        },
+        {
+          "text": "And so with the bismuth there, that dip happens at 30 to 40. Yeah. Yeah. And there's not the corresponding one. Yeah. So the presumption is that it's all due to first neighbor bodies. Yes, yes. So that's the presumption. So what have you looked at? Yes. How are you getting at this? Yes, so I looked at the uh similar Albertal overlap analysis that I did for the PSS and the USS solutes in the grain boundary. And what I found was there is there is no second neighbor bonding at all with the bismuth in the center. Whatever And how did you conclude that? So I was just looking for uh bismuth overlap with the corresponding copper atoms in the cluster. Okay. And when there's copper there you find it, when there's bismuth there you don't. Yes. Okay. And there is a lot.",
+          "start": 60.0,
+          "end": 120.0
+        },
+        {
+          "text": "More anti-bonding orientation with the bismuth than with the copper. So the only sort of first neighbor bonds that are found are between like the 5 or 6s of the bismuth orbital and uh the corresponding D orbitals of copper. Okay. And they were just very, very few. Okay. So that's sort of what the conclusion that I have after sort of looking at this from the orbital overlap perspective. Okay. Because what we were seeing was the essentially the closing of the octahedral hole. If you're further over towards like bias towards the FCC side, you see that increase of kinetic energy, or you see that increase of kinetic energy because you have contributions from heavily Sigma antibonding EGs coming down below the Fermi level and being populated, then. Say that again. So when you when you close the",
+          "start": 120.0,
+          "end": 180.0
+        },
+        {
+          "text": "octahedral hole in something that's towards the BCC side, you aren't filling any states, you aren't filling very many states that are anti-bonding, especially anti-bonding that are across that octahedral hole. But once you start getting to HCP and especially the FCCs, you start feeling a lot of states that are heavily antibonding with respect to the octahedral hole. And so that's that was like when we see the spike happening as soon as you complete that octahedral hole that we were associating with the filling of those specific states. So this is all kind of consistent with the things that that were we were guessing before. But now you say I've got specific things I can show pictures I can make this case. Yes. Okay so let's let's look at the other things that we were working on and I'll come back",
+          "start": 180.0,
+          "end": 240.0
+        },
+        {
+          "text": "to the things you're working on. So the iron uh BCC iron calculation with band. Right. So is that finished? Yes, that is finished. Get the right moment. Again, I don't know how to find the magnetic moment value from band. So I submitted an SUM support request and uh waiting for them to get back to me. But in the meantime I ran a BAST calculation just for the BCC iron unit cell to see what if that converges the correct moments and it gave me about 2.2 board magnetons. And I'm also thinking I'll probably do like an energy versus lattice constant. After relaxing the uh available lattice constant from uh you know literature I could also do an energy versus uh lattice constant to see if that indeed is the minimum value with VASP. And what's that for? What do you care?",
+          "start": 240.0,
+          "end": 300.0
+        },
+        {
+          "text": "Just to ensure that that's the lowest energy uh corresponding to that lattice constant. And again, why do you care? What what was the purpose of doing the valve calculation? Just to see if it would converge uh to the right magnetic moment. I mean we assume it'll converge to the right magnetic moment. There was another purpose to the valve calculation. To compare it with uh the band and ADS calculations. Compare what? The uh density distribution or the gradient bundle. Have you done the gradient bundles? No, I have not done the gradient bundles yet. For either iron, for either band or for bass? Yes. Okay. So now, legal, why is it taking us so long to get gradient bundles done on these? Oh, I I was just ensuring that uh we we get the right the right values and then get.",
+          "start": 300.0,
+          "end": 360.0
+        },
+        {
+          "text": "But I mean the purpose of these calculations was to simply see if if if we got the same topology for the gradient bundle decomposition. Right, right, right. I mean we've been waiting for more than a year for a gradient bundle decomposition for any any system. I mean the only ones that we've done at this point are you've got some preliminary ones with boron and phosphorus in a um in a small cluster, but we have nothing else. Right. Why is it taking us so long? No, I'll I'll I'll get them done. I'm I'm almost there. I'll I'll get them done. I mean now the you you really need to get on these because this is this is what you're bringing to this. This the gradient bundle decompositions are going to provide insight as to whether you've got this second neighbor bonding robot, and so and you don't have that much time left. You really need to be moving forward on those.",
+          "start": 360.0,
+          "end": 420.0
+        },
+        {
+          "text": "Okay. And the only purpose for the VASP calculations was just to look at it and say, are we seeing the same gradient bundle decomposition? Sitting and doing a VASP relaxation, it's going to relax to a different. So you're using the lattice concept for the VASP calculation you got from what? From experiment or from uh from literature. Yes. So just like the Van calculation gave you a 2% different result, so too the VAT calculation will give you a 2 or 3 different percent, whether it be larger or smaller, I don't know, but it won't be the same. But so what? And you you got you got a good magnetic moment, 2.2. Right. So you really have to move forward on these things. Okay, so now let's let's talk about your stuff. So you've got a paper coming up that's due in May. So tell me what your thoughts are on that. So my thoughts are Malvika and I also, when we discussed the orbitals, we discussed what would make the most sense.",
+          "start": 420.0,
+          "end": 480.0
+        },
+        {
+          "text": "As far as the figure, because that's been something I've been thinking about as far as showing. And so I've also talked with Tim a little bit about doing this, and I'm starting making the figures where we can actually see, especially it the results that are the most interesting to me so far, that you can see the biggest trend, is with the EGs on the central atom, how those split into the uh larger bands as we move up in cluster size. Explain that to me. So, like I was saying with the results we were talking about with hers, you see um, say for niobium, you're only filling bands with sigma bonding character with respect to the nearest neighbor interactions, and you're getting very little interaction across the octahedral hole versus transition over to uh FCC, and you see really strong or you see filling of",
+          "start": 480.0,
+          "end": 540.0
+        },
+        {
+          "text": "Very strongly anti-bonding orbitals that are above the Fermi level, but they're as you add more and more shells, portions of that keep dipping below the Fermi level as you get bigger. So showing these orbitals and specifically showing the octahedral hole itself and kind of having the nuclear critical points, maybe the bond paths, to frame the octahedral hole, and then showing the different orbitals in the octahedral hole itself, and then splitting that into bands just as a color map, and then showing the Fermi level as it progresses across the Siri. Okay. So we can start making arguments about okay, we're starting to fill these states in the band, we're starting to fill these states in the band. This is why we see a transition in structure. Now I would be shocked if somebody has not done something similar from just straight band calculations. Okay. So they take band calculations and they're going to have a uh",
+          "start": 540.0,
+          "end": 600.0
+        }
+      ],
+      "is_partial": false
+    }
+  ]
+}

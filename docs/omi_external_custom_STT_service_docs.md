@@ -2,17 +2,17 @@
 
 ## Overview
 
-TranscriptionSuite implements the Omi External Custom STT WebSocket protocol at `/ws/omi`.  
+TranscriptionSuite implements the Omi External Custom STT WebSocket protocol at `/ws/stt`.  
 This document covers both the upstream protocol spec and the specifics of this server's implementation.
 
 ---
 
-## Using the `/ws/omi` Endpoint
+## Using the `/ws/stt` Endpoint
 
 ### Endpoint URL
 
 ```text
-ws://<host>:9786/ws/omi?token=<api-token>&codec=pcm&sample_rate=16000&language=en
+ws://<host>:9786/ws/stt?token=<api-token>&codec=pcm&sample_rate=16000&language=en
 ```
 
 **Query parameters:**

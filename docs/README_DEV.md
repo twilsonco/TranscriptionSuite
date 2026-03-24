@@ -1526,9 +1526,9 @@ Tail recent server log entries. Query params: `service` (filter), `level` (filte
 
 ---
 
-### 7.5 WebSocket STT (Omi) Endpoint
+### 7.5 WebSocket STT Endpoint
 
-The `/ws/stt` endpoint (aliased as `/ws/omi` for backward compatibility) provides a WebSocket-based streaming STT interface compatible with the [Omi External Custom STT protocol](https://docs.omi.me/developer/backend/custom-stt).
+The `/ws/stt` endpoint provides a WebSocket-based streaming STT interface compatible with the [Omi External Custom STT protocol](https://docs.omi.me/developer/backend/custom-stt).
 
 See [`docs/omi_external_custom_STT_service_docs.md`](omi_external_custom_STT_service_docs.md) for full Omi integration instructions.
 

@@ -90,7 +90,6 @@ PUBLIC_ROUTES = {
     "/auth",
     "/auth/",
     "/ws/stt",  # streaming STT: auth is validated inside the handler via query-param token
-    "/ws/omi",  # backward-compat alias for Omi devices
     "/favicon.ico",
 }
 

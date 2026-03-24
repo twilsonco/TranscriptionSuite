@@ -433,8 +433,7 @@ logging:
 # ============================================================================
 # WebSocket STT Configuration
 # ============================================================================
-# Settings for the /ws/stt WebSocket endpoint (also available at /ws/omi for
-# backward compatibility with Omi devices and other clients).
+# Settings for the /ws/stt WebSocket endpoint.
 # See: docs/omi_external_custom_STT_service_docs.md
 ws_stt:
     # Enable the /ws/stt endpoint.

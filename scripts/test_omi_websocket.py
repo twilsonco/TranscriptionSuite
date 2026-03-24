@@ -133,13 +133,13 @@ async def process_file(
     print(f"    Duration    : {duration:.1f}s")
     print(f"    PCM payload : {len(pcm_bytes):,} bytes  ({len(pcm_bytes) // 2:,} samples)")
 
-    uri = f"{server_url}/ws/omi?token={token}&codec=pcm&sample_rate={TARGET_SAMPLE_RATE}"
+    uri = f"{server_url}/ws/stt?token={token}&codec=pcm&sample_rate={TARGET_SAMPLE_RATE}"
     if language:
         uri += f"&language={language}"
     if speaker_labels:
         uri += "&speaker_labels=true"
 
-    print(f"    Connecting  : {server_url}/ws/omi")
+    print(f"    Connecting  : {server_url}/ws/stt")
 
     responses: list[dict] = []
     chunk_bytes = CHUNK_FRAMES * 2  # 2 bytes per Int16 sample
