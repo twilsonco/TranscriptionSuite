@@ -431,6 +431,40 @@ logging:
     backup_count: 5
 
 # ============================================================================
+# WebSocket STT Configuration
+# ============================================================================
+# Settings for the /ws/stt WebSocket endpoint (also available at /ws/omi for
+# backward compatibility with Omi devices and other clients).
+# See: docs/omi_external_custom_STT_service_docs.md
+ws_stt:
+    # Enable the /ws/stt endpoint.
+    enabled: true
+
+    # Close the connection (and end the conversation) after this many seconds
+    # with no inbound audio frames.  Also used as the cross-connection stitch
+    # window: a new connection arriving within this window continues the same
+    # conversation.  Omi's server-side idle timeout is 90 seconds.
+    inactivity_timeout_s: 90
+
+    # Flush and transcribe a mini-segment after this many seconds of silence
+    # (no audio frames received).  Delivers partial results progressively.
+    segment_silence_s: 5.0
+
+    # Skip transcription of pending audio shorter than this (saves compute).
+    min_segment_s: 0.5
+
+    # Prepend this many seconds of previous conversation audio as context when
+    # transcribing each segment (improves quality at segment boundaries).
+    context_window_s: 300.0
+
+    # Force-flush pending audio when it reaches this duration (prevents very
+    # long segments when speech is continuous without pauses).
+    max_segment_s: 300.0
+
+    # Hard cap on conversation duration (2 hours).
+    max_conversation_s: 7200.0
+
+# ============================================================================
 # Real-time STT Engine Configuration
 # ============================================================================
 # Settings for the real-time speech-to-text engine used for live transcription.

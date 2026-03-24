@@ -9,8 +9,10 @@ Handles:
 """
 
 import asyncio
+import functools
 import logging
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -71,6 +73,7 @@ async def transcribe_audio(
     diarization: bool | None = Form(None),
     expected_speakers: int | None = Form(None),
     parallel_diarization: bool | None = Form(None),
+    save_to_notebook: bool = Form(False),
 ) -> dict[str, Any]:
     """
     Transcribe an uploaded audio file.
@@ -169,13 +172,16 @@ async def transcribe_audio(
                     tmp_path, target_sample_rate=preferred_rate
                 )
 
-                diar_result = backend.transcribe_with_diarization(
-                    audio_data,
-                    audio_sample_rate=audio_sample_rate,
-                    language=language,
-                    task="translate" if translation_enabled else "transcribe",
-                    beam_size=engine.beam_size,
-                    num_speakers=expected_speakers,
+                diar_result = await asyncio.to_thread(
+                    functools.partial(
+                        backend.transcribe_with_diarization,
+                        audio_data,
+                        audio_sample_rate=audio_sample_rate,
+                        language=language,
+                        task="translate" if translation_enabled else "transcribe",
+                        beam_size=engine.beam_size,
+                        num_speakers=expected_speakers,
+                    )
                 )
 
                 from server.core.stt.engine import TranscriptionResult
@@ -189,8 +195,8 @@ async def transcribe_audio(
                     duration=len(audio_data) / audio_sample_rate,
                     num_speakers=diar_result.num_speakers,
                 )
-
-                return result.to_dict()
+                # result is ready; skip the standard diarization path below
+                use_integrated_diarization = True
 
             except Exception:
                 logger.warning(
@@ -198,82 +204,127 @@ async def transcribe_audio(
                     exc_info=True,
                 )
                 # Fall through to standard transcription without diarization
+                use_integrated_diarization = False
                 diarization = False
 
-        # Force word timestamps when diarization is requested
-        # (needed for proper text-to-speaker alignment)
-        need_word_timestamps = word_timestamps or diarization
+        if not use_integrated_diarization:
+            # Force word timestamps when diarization is requested
+            # (needed for proper text-to-speaker alignment)
+            need_word_timestamps = word_timestamps or diarization
 
-        if diarization:
-            # Resolve parallel vs sequential diarization
-            config = request.app.state.config
-            use_parallel = (
-                parallel_diarization
-                if parallel_diarization is not None
-                else config.get("diarization", "parallel", default=True)
-            )
+            if diarization:
+                # Resolve parallel vs sequential diarization
+                config = request.app.state.config
+                use_parallel = (
+                    parallel_diarization
+                    if parallel_diarization is not None
+                    else config.get("diarization", "parallel", default=True)
+                )
 
-            if use_parallel:
-                from server.core.parallel_diarize import transcribe_and_diarize
+                if use_parallel:
+                    from server.core.parallel_diarize import transcribe_and_diarize
 
-                diarize_fn = transcribe_and_diarize
-            else:
-                from server.core.parallel_diarize import transcribe_then_diarize
+                    diarize_fn = transcribe_and_diarize
+                else:
+                    from server.core.parallel_diarize import transcribe_then_diarize
 
-                diarize_fn = transcribe_then_diarize
+                    diarize_fn = transcribe_then_diarize
 
-            result, diar_result = diarize_fn(
-                engine=engine,
-                model_manager=model_manager,
-                file_path=tmp_path,
-                language=language,
-                task="translate" if translation_enabled else "transcribe",
-                translation_target_language=(
-                    translation_target_language if translation_enabled else None
-                ),
-                word_timestamps=need_word_timestamps,
-                expected_speakers=expected_speakers,
-                cancellation_check=model_manager.job_tracker.is_cancelled,
-            )
-
-            if diar_result is not None:
-                try:
-                    from server.core.speaker_merge import build_speaker_segments
-
-                    diar_dicts = [seg.to_dict() for seg in diar_result.segments]
-                    merged_segments, merged_words, num_speakers = build_speaker_segments(
-                        result.words, diar_dicts
+                result, diar_result = await asyncio.to_thread(
+                    functools.partial(
+                        diarize_fn,
+                        engine=engine,
+                        model_manager=model_manager,
+                        file_path=tmp_path,
+                        language=language,
+                        task="translate" if translation_enabled else "transcribe",
+                        translation_target_language=(
+                            translation_target_language if translation_enabled else None
+                        ),
+                        word_timestamps=need_word_timestamps,
+                        expected_speakers=expected_speakers,
+                        cancellation_check=model_manager.job_tracker.is_cancelled,
                     )
+                )
 
-                    if merged_segments:
-                        result.segments = merged_segments
-                        result.words = merged_words
-                        result.num_speakers = num_speakers
-                        logger.info(
-                            "Speaker merge complete: %s speakers, %s segments",
-                            num_speakers,
-                            len(merged_segments),
+                if diar_result is not None:
+                    try:
+                        from server.core.speaker_merge import build_speaker_segments
+
+                        diar_dicts = [seg.to_dict() for seg in diar_result.segments]
+                        merged_segments, merged_words, num_speakers = build_speaker_segments(
+                            result.words, diar_dicts
                         )
-                except Exception:
-                    logger.warning(
-                        "Speaker merge failed (returning transcript without speakers)",
-                        exc_info=True,
-                    )
-        else:
-            # Transcribe without diarization
-            logger.info("Transcribing uploaded file")
-            result = engine.transcribe_file(
-                tmp_path,
-                language=language,
-                task="translate" if translation_enabled else "transcribe",
-                translation_target_language=(
-                    translation_target_language if translation_enabled else None
-                ),
-                word_timestamps=need_word_timestamps,
-                cancellation_check=model_manager.job_tracker.is_cancelled,
-            )
 
-        return result.to_dict()
+                        if merged_segments:
+                            result.segments = merged_segments
+                            result.words = merged_words
+                            result.num_speakers = num_speakers
+                            logger.info(
+                                "Speaker merge complete: %s speakers, %s segments",
+                                num_speakers,
+                                len(merged_segments),
+                            )
+                    except Exception:
+                        logger.warning(
+                            "Speaker merge failed (returning transcript without speakers)",
+                            exc_info=True,
+                        )
+            else:
+                # Transcribe without diarization
+                logger.info("Transcribing uploaded file")
+                result = await asyncio.to_thread(
+                    functools.partial(
+                        engine.transcribe_file,
+                        tmp_path,
+                        language=language,
+                        task="translate" if translation_enabled else "transcribe",
+                        translation_target_language=(
+                            translation_target_language if translation_enabled else None
+                        ),
+                        word_timestamps=need_word_timestamps,
+                        cancellation_check=model_manager.job_tracker.is_cancelled,
+                    )
+                )
+
+        result_dict = result.to_dict()
+
+        # Optionally save to Audio Notebook in the background
+        if save_to_notebook and result.segments:
+            try:
+                from server.api.routes.notebook import save_to_notebook_sync
+                from server.core.audio_utils import load_audio as _load_audio
+
+                audio_data, audio_sr = await asyncio.to_thread(
+                    _load_audio, tmp_path, target_sample_rate=16000
+                )
+                recorded_at = datetime.now()
+                asyncio.create_task(
+                    asyncio.to_thread(
+                        save_to_notebook_sync,
+                        audio_source=audio_data,
+                        sample_rate=audio_sr,
+                        filename=file.filename or "recording.wav",
+                        transcription_text=result.text,
+                        duration_seconds=result.duration,
+                        segments=result.segments,
+                        language=result.language,
+                        transcription_backend=None,
+                        title=None,
+                        recorded_at=recorded_at,
+                    ),
+                    name=f"notebook_save_{Path(tmp_path).stem}",
+                )
+                result_dict["notebook_save_queued"] = True
+                logger.info(
+                    "transcribe_audio: notebook save queued for '%s'", file.filename
+                )
+            except Exception as exc:
+                logger.warning(
+                    "transcribe_audio: failed to queue notebook save: %s", exc, exc_info=True
+                )
+
+        return result_dict
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -342,15 +393,18 @@ async def transcribe_quick(
 
         # Transcribe without word timestamps for speed, with cancellation support
         logger.info("Quick transcription started")
-        result = engine.transcribe_file(
-            tmp_path,
-            language=language,
-            task="translate" if translation_enabled else "transcribe",
-            translation_target_language=(
-                translation_target_language if translation_enabled else None
-            ),
-            word_timestamps=False,  # No word timestamps for speed
-            cancellation_check=model_manager.job_tracker.is_cancelled,
+        result = await asyncio.to_thread(
+            functools.partial(
+                engine.transcribe_file,
+                tmp_path,
+                language=language,
+                task="translate" if translation_enabled else "transcribe",
+                translation_target_language=(
+                    translation_target_language if translation_enabled else None
+                ),
+                word_timestamps=False,  # No word timestamps for speed
+                cancellation_check=model_manager.job_tracker.is_cancelled,
+            )
         )
 
         return result.to_dict()
