@@ -13,6 +13,7 @@ Stores tokens in a JSON file with support for:
 import hashlib
 import json
 import logging
+import os
 import secrets
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
@@ -23,7 +24,8 @@ from filelock import FileLock
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TOKEN_STORE_PATH = Path("/data/tokens/tokens.json")
+_DEFAULT_DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
+DEFAULT_TOKEN_STORE_PATH = _DEFAULT_DATA_DIR / "tokens" / "tokens.json"
 
 # Default token expiration (30 days)
 DEFAULT_TOKEN_EXPIRY_DAYS = 30
@@ -351,5 +353,9 @@ def get_token_store(store_path: Optional[Path] = None) -> TokenStore:
     """Get or create the global token store instance."""
     global _token_store
     if _token_store is None:
+        if store_path is None:
+            # Respect DATA_DIR env var so the server works outside Docker
+            data_dir = Path(os.environ.get("DATA_DIR", "/data"))
+            store_path = data_dir / "tokens" / "tokens.json"
         _token_store = TokenStore(store_path)
     return _token_store
