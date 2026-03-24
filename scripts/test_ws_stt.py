@@ -399,7 +399,7 @@ async def run(
     stitch_test: bool,
 ) -> None:
     token = get_admin_token()
-    print(f"Token : {token[:8]}…{token[-6:]}")
+    print(f"Token : {token[:4]}…{token[-4:]}")
     print(f"Server: {server_url}")
     print(f"Files : {[p.name for p in files]}")
     if save_to_notebook:
@@ -433,6 +433,8 @@ def main() -> None:
             "Examples:\n"
             "  python scripts/test_ws_stt.py\n"
             "  python scripts/test_ws_stt.py samples/input/1min_test.wav\n"
+            "  python scripts/test_ws_stt.py file1.wav file2.wav\n"
+            "  python scripts/test_ws_stt.py --dir /path/to/audio/files\n"
             "  python scripts/test_ws_stt.py --save-to-notebook samples/input/1min_test.wav\n"
             "  python scripts/test_ws_stt.py --stitch-test samples/input/1min_test.wav\n"
             "  python scripts/test_ws_stt.py --server ws://10.0.1.90:9786 --language en\n"
@@ -473,17 +475,26 @@ def main() -> None:
         action="store_true",
         help="Send file as two sequential connections to verify conversation stitching.",
     )
+    parser.add_argument(
+        "--dir",
+        type=Path,
+        default=None,
+        metavar="DIRECTORY",
+        help="Directory of audio files to process (default: samples/input/). "
+             "Ignored if file paths are given as positional arguments.",
+    )
 
     args = parser.parse_args()
 
     if args.files:
         files = [Path(f) for f in args.files]
     else:
+        input_dir = args.dir if args.dir else SAMPLES_INPUT
         files = sorted(
-            p for p in SAMPLES_INPUT.iterdir() if p.suffix.lower() in SUPPORTED_EXTENSIONS
+            p for p in input_dir.iterdir() if p.suffix.lower() in SUPPORTED_EXTENSIONS
         )
         if not files:
-            print(f"No audio files found in {SAMPLES_INPUT}  (WAV/FLAC/OGG)")
+            print(f"No audio files found in {input_dir}  (WAV/FLAC/OGG)")
             sys.exit(1)
 
     asyncio.run(

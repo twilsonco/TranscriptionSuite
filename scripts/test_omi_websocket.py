@@ -119,9 +119,13 @@ async def process_file(
     server_url: str,
     language: str | None,
     receive_timeout: float,
-) -> dict:
+) -> list[dict]:
     """
-    Stream audio to /ws/omi as PCM and return the parsed JSON response.
+    Stream audio to /ws/omi as PCM, collect all response messages, and return them.
+
+    The endpoint delivers partial segments as speech pauses are detected, then a
+    final message with is_partial=False after CloseStream.  Both the sender and
+    receiver run concurrently so partial messages are not silently dropped.
     """
     print(f"    Loading audio …")
     pcm_bytes, duration = load_as_pcm_int16(path)
@@ -134,22 +138,49 @@ async def process_file(
 
     print(f"    Connecting  : {server_url}/ws/omi")
 
-    async with websockets.connect(uri, max_size=2**24, open_timeout=15) as ws:
-        # Send PCM in fixed-size chunks
-        chunk_bytes = CHUNK_FRAMES * 2  # 2 bytes per Int16 sample
-        n_chunks = 0
-        for offset in range(0, len(pcm_bytes), chunk_bytes):
-            await ws.send(pcm_bytes[offset : offset + chunk_bytes])
-            n_chunks += 1
+    responses: list[dict] = []
+    chunk_bytes = CHUNK_FRAMES * 2  # 2 bytes per Int16 sample
 
-        print(f"    Audio sent  : {n_chunks} chunk(s)  → sending CloseStream …")
-        await ws.send(json.dumps({"type": "CloseStream"}))
+    async with websockets.connect(
+        uri, max_size=2**24, open_timeout=15, ping_interval=None
+    ) as ws:
+        # Sender: stream all chunks then signal end
+        async def _send() -> None:
+            n_chunks = 0
+            for offset in range(0, len(pcm_bytes), chunk_bytes):
+                await ws.send(pcm_bytes[offset : offset + chunk_bytes])
+                n_chunks += 1
+                await asyncio.sleep(0.001)  # yield to event loop
+            print(f"    Audio sent  : {n_chunks} chunk(s)  → sending CloseStream …")
+            await ws.send(json.dumps({"type": "CloseStream"}))
 
-        print(f"    Waiting for transcription (timeout={receive_timeout:.0f}s) …")
-        raw = await asyncio.wait_for(ws.recv(), timeout=receive_timeout)
+        # Receiver: collect all messages until server closes the connection
+        async def _recv() -> None:
+            print(f"    Waiting for transcription (timeout={receive_timeout:.0f}s) …")
+            while True:
+                try:
+                    raw = await asyncio.wait_for(ws.recv(), timeout=receive_timeout)
+                    payload = json.loads(raw)
+                    responses.append(payload)
+                    segs = payload.get("segments", [])
+                    is_partial = payload.get("is_partial", True)
+                    tag = "partial" if is_partial else "final"
+                    print(
+                        f"    ← [{tag}] {len(segs)} segment(s)"
+                        + (f': "{segs[0].get("text", "")[:60]}"' if segs else "")
+                    )
+                except websockets.exceptions.ConnectionClosedOK:
+                    break
+                except websockets.exceptions.ConnectionClosedError as exc:
+                    print(f"    ← connection closed with error: {exc}")
+                    break
+                except asyncio.TimeoutError:
+                    print(f"    ← receive timeout after {receive_timeout:.0f}s")
+                    break
 
-    result = json.loads(raw)
-    return result
+        await asyncio.gather(_send(), _recv())
+
+    return responses
 
 
 # ---------------------------------------------------------------------------
@@ -193,21 +224,37 @@ async def run(files: list[Path], server_url: str, language: str | None) -> None:
         out_path = SAMPLES_OUTPUT / out_name
 
         try:
-            result = await process_file(path, token, server_url, language, receive_timeout)
+            responses = await process_file(path, token, server_url, language, receive_timeout)
         except Exception as exc:
             print(f"    ✗  Error: {exc}\n")
             failed += 1
             continue
 
-        segments: list[dict] = result.get("segments", [])
-        error = result.get("error")
-
-        if error:
-            print(f"    ✗  Server error: {error} — {result.get('message', '')}\n")
+        if not responses:
+            print("    ✗  No responses received\n")
             failed += 1
             continue
 
-        print(f"    ✓  {len(segments)} segment(s) returned")
+        # Prefer the final (is_partial=False) message; fall back to merging partials
+        result: dict = {}
+        for r in reversed(responses):
+            if not r.get("is_partial", True):
+                result = r
+                break
+        if not result:
+            merged_segs: list[dict] = []
+            for r in responses:
+                merged_segs.extend(r.get("segments", []))
+            result = {"segments": merged_segs, "is_partial": True}
+
+        error = next((r.get("error") for r in responses if r.get("error")), None)
+        if error:
+            print(f"    ✗  Server error: {error}\n")
+            failed += 1
+            continue
+
+        segments: list[dict] = result.get("segments", [])
+        print(f"    ✓  {len(segments)} segment(s) [{len(responses)} message(s)]")
         if segments:
             first_text = segments[0].get("text", "").strip()
             print(f'    ↳ First : "{first_text[:90]}"')
@@ -219,8 +266,9 @@ async def run(files: list[Path], server_url: str, language: str | None) -> None:
             "processed_at": ts,
             "server": server_url,
             "language_hint": language,
+            "messages_received": len(responses),
             "segment_count": len(segments),
-            "result": result,
+            "responses": responses,
         }
         out_path.write_text(json.dumps(output, indent=2, ensure_ascii=False))
         print(f"    → Saved: {out_path.relative_to(REPO_ROOT)}\n")
@@ -237,13 +285,14 @@ def main() -> None:
             "Examples:\n"
             "  python scripts/test_omi_websocket.py\n"
             "  python scripts/test_omi_websocket.py samples/input/1min_test.wav\n"
+            "  python scripts/test_omi_websocket.py --dir /path/to/audio/files\n"
             "  python scripts/test_omi_websocket.py --server ws://10.0.1.90:9786 --language en\n"
         ),
     )
     parser.add_argument(
         "files",
         nargs="*",
-        help=f"Audio file(s) to process. Default: all WAV/FLAC in {SAMPLES_INPUT}",
+        help="Audio file(s) to process. Default: all WAV/FLAC in --dir (or samples/input/)",
     )
     parser.add_argument(
         "--server",
@@ -256,17 +305,26 @@ def main() -> None:
         metavar="LANG",
         help="BCP-47 language code, e.g. 'en'. Default: auto-detect.",
     )
+    parser.add_argument(
+        "--dir",
+        type=Path,
+        default=None,
+        metavar="DIRECTORY",
+        help="Directory of audio files to process (default: samples/input/). "
+             "Ignored if file paths are given as positional arguments.",
+    )
     args = parser.parse_args()
 
     if args.files:
         paths = [Path(f) for f in args.files]
     else:
+        input_dir = args.dir if args.dir else SAMPLES_INPUT
         paths = sorted(
-            p for p in SAMPLES_INPUT.iterdir()
+            p for p in input_dir.iterdir()
             if p.suffix.lower() in SUPPORTED_EXTENSIONS
         )
         if not paths:
-            print(f"No WAV/FLAC files found in {SAMPLES_INPUT}")
+            print(f"No WAV/FLAC files found in {input_dir}")
             print("Copy sample files there first, or pass file paths as arguments.")
             sys.exit(1)
 
