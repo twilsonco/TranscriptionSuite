@@ -52,7 +52,8 @@ Technical documentation for developing and building TranscriptionSuite.
     - [Admin](#admin)
   - [7.3 WebSocket Protocol](#73-websocket-protocol)
   - [7.4 Live Mode WebSocket Protocol](#74-live-mode-websocket-protocol)
-  - [7.5 OpenAI-Compatible Endpoints](#75-openai-compatible-endpoints)
+  - [7.5 WebSocket STT (Omi) Endpoint](#75-websocket-stt-omi-endpoint)
+  - [7.6 OpenAI-Compatible Endpoints](#76-openai-compatible-endpoints)
 - [8. Backend Development](#8-backend-development)
   - [8.1 Backend Structure](#81-backend-structure)
   - [8.2 Running the Server Locally](#82-running-the-server-locally)
@@ -1525,7 +1526,77 @@ Tail recent server log entries. Query params: `service` (filter), `level` (filte
 
 ---
 
-### 7.5 OpenAI-Compatible Endpoints
+### 7.5 WebSocket STT (Omi) Endpoint
+
+The `/ws/stt` endpoint (aliased as `/ws/omi` for backward compatibility) provides a WebSocket-based streaming STT interface compatible with the [Omi External Custom STT protocol](https://docs.omi.me/developer/backend/custom-stt).
+
+See [`docs/omi_external_custom_STT_service_docs.md`](omi_external_custom_STT_service_docs.md) for full Omi integration instructions.
+
+**Connection URL:**
+```
+ws://<host>:9786/ws/stt?token=<api-token>&codec=pcm&save_to_notebook=true
+```
+
+**Query Parameters:**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `token` | *(none)* | API token (required in TLS mode; loopback-trusted in local mode) |
+| `codec` | `pcm` | Audio codec: `pcm` (signed 16-bit LE) or `opus` |
+| `sample_rate` | `16000` | Input sample rate in Hz |
+| `language` | *(auto)* | BCP-47 language code, e.g. `en` |
+| `save_to_notebook` | `false` | Set to `true`/`1` to save the final conversation to Audio Notebook |
+
+**Protocol:**
+- **Client → Server:** binary audio frames OR `{"type": "CloseStream"}` JSON message
+- **Server → Client:** `{"segments": [...], "is_partial": bool}` JSON messages
+
+**Segment format:**
+```json
+{
+  "segments": [
+    {"text": "Hello world", "start": 0.0, "end": 1.5},
+    {"text": "How are you?", "start": 1.8, "end": 3.2, "speaker": "SPEAKER_00"}
+  ],
+  "is_partial": true
+}
+```
+
+**Streaming behavior:**
+- Segments are delivered progressively as speech pauses are detected (`segment_silence_s` in config).
+- Timestamps are **absolute seconds from the conversation start**, so they stitch correctly across multiple connections.
+- A final delivery with `is_partial: false` is sent on graceful `CloseStream` close.
+- An inactivity timeout (`inactivity_timeout_s`, default 90 s) ends the conversation when no audio is received.
+
+**Cross-connection session stitching:**
+Multiple WebSocket connections sharing the same API token are grouped into one conversation if they arrive within `inactivity_timeout_s` of each other. This matches the Omi device reconnect behavior.
+
+**Notebook save:**
+When `save_to_notebook=true`, the complete conversation audio is re-transcribed at high quality (with full diarization if available) and saved to the Audio Notebook when the conversation ends. This is a background task and does not block new connections.
+
+**Audio formats:**
+- PCM: raw signed 16-bit little-endian samples at `sample_rate` Hz
+- Opus: standard Opus packets (requires `opuslib` Python package and system `libopus`)
+
+**Configuration** (`server/config.yaml` `ws_stt` section):
+```yaml
+ws_stt:
+  enabled: true
+  inactivity_timeout_s: 90
+  segment_silence_s: 5.0
+  min_segment_s: 0.5
+  context_window_s: 300.0
+  max_segment_s: 300.0
+  max_conversation_s: 7200.0
+```
+
+**Manual test scripts** (in `scripts/`):
+- `test_ws_stt.py` — comprehensive test covering PCM/Opus, save-to-notebook, multi-connection stitching
+- `test_omi_websocket.py` — lightweight Omi device simulation test
+
+---
+
+### 7.6 OpenAI-Compatible Endpoints
 
 Mounted at `/v1/audio/`. These endpoints follow the [OpenAI Audio API spec](https://platform.openai.com/docs/api-reference/audio) so that OpenAI-compatible clients (Open-WebUI, LM Studio, etc.) can point at TranscriptionSuite as a drop-in STT backend.
 
