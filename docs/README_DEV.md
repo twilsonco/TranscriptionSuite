@@ -1731,9 +1731,19 @@ cd server/backend
 uv venv --python 3.13
 uv sync
 
-# Development mode with auto-reload
-uv run uvicorn server.api.main:app --reload --host 0.0.0.0 --port 9786
+# macOS — point DATA_DIR at the existing app data directory so the server
+# shares tokens, database, and audio files with the Docker installation.
+DATA_DIR="$HOME/Library/Application Support/TranscriptionSuite/data" \
+  .venv/bin/uvicorn server.api.main:app --host 127.0.0.1 --port 9787
+
+# Linux (typical)
+DATA_DIR="$HOME/.local/share/TranscriptionSuite/data" \
+  .venv/bin/uvicorn server.api.main:app --host 127.0.0.1 --port 9787
 ```
+
+> **Note**: use a different port (e.g. `9787`) when the Docker container is
+> already running on `9786`.  Point test scripts at the dev server with
+> `--server ws://127.0.0.1:9787`.
 
 ### 8.3 Configuration System
 
