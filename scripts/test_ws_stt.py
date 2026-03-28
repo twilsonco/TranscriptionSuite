@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Test script for the /ws/stt WebSocket STT endpoint (canonical path).
-Also works with the /ws/omi backward-compat alias.
 
 Streams a WAV/FLAC file as PCM audio and collects all progressive segment
 responses, then prints the assembled transcript.  The endpoint delivers

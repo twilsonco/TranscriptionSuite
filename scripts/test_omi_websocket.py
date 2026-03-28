@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Test script for the /ws/omi WebSocket endpoint.
+Test script for the /ws/stt WebSocket endpoint.
 
-Reads WAV files, sends PCM audio to the OMI STT endpoint, and saves the
+Reads WAV files, sends PCM audio to the websocket STT endpoint, and saves the
 JSON segment output to samples/output/<stem>_<timestamp>.json.
 
 Usage:
@@ -122,7 +122,7 @@ async def process_file(
     speaker_labels: bool = False,
 ) -> list[dict]:
     """
-    Stream audio to /ws/omi as PCM, collect all response messages, and return them.
+    Stream audio to /ws/stt as PCM, collect all response messages, and return them.
 
     The endpoint delivers partial segments as speech pauses are detected, then a
     final message with is_partial=False after CloseStream.  Both the sender and
@@ -289,7 +289,7 @@ async def run(files: list[Path], server_url: str, language: str | None, speaker_
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Test the /ws/omi OMI External STT WebSocket endpoint",
+        description="Test the /ws/stt OMI External STT WebSocket endpoint",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
