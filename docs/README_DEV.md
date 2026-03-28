@@ -1530,8 +1530,6 @@ Tail recent server log entries. Query params: `service` (filter), `level` (filte
 
 The `/ws/stt` endpoint provides a WebSocket-based streaming STT interface compatible with the [Omi External Custom STT protocol](https://docs.omi.me/developer/backend/custom-stt).
 
-See [`docs/omi_external_custom_STT_service_docs.md`](omi_external_custom_STT_service_docs.md) for full Omi integration instructions.
-
 **Connection URL:**
 ```
 ws://<host>:9786/ws/stt?token=<api-token>&codec=pcm&save_to_notebook=true
@@ -1546,6 +1544,7 @@ ws://<host>:9786/ws/stt?token=<api-token>&codec=pcm&save_to_notebook=true
 | `sample_rate` | `16000` | Input sample rate in Hz |
 | `language` | *(auto)* | BCP-47 language code, e.g. `en` |
 | `save_to_notebook` | `false` | Set to `true`/`1` to save the final conversation to Audio Notebook |
+| `speaker_labels` | `false` | Set to `true`/`1` to run diarization after `CloseStream` and receive speaker-attributed segments |
 
 **Protocol:**
 - **Client → Server:** binary audio frames OR `{"type": "CloseStream"}` JSON message
@@ -1574,9 +1573,31 @@ Multiple WebSocket connections sharing the same API token are grouped into one c
 **Notebook save:**
 When `save_to_notebook=true`, the complete conversation audio is re-transcribed at high quality (with full diarization if available) and saved to the Audio Notebook when the conversation ends. This is a background task and does not block new connections.
 
+**Speaker diarization (`speaker_labels=true`):**
+
+When `speaker_labels=true`, after `CloseStream` the server runs diarization on the full conversation audio and sends a **second** final message (`is_partial: false, diarization_complete: true`) with speaker-attributed segments. HF token resolution priority:
+1. `HF_TOKEN` environment variable / `HUGGINGFACE_TOKEN` in `server/docker/.env`
+2. `diarization.hf_token` in `server/config.yaml`
+3. `server.hfToken` saved via the dashboard Settings panel
+
+Diarization backend priority (when a token is available):
+1. **WhisperX backend** — native integrated diarization (`transcribe_with_diarization`)
+2. **All other backends** — pyannote parallel-diarize pipeline (same as `/api/transcribe/file`)
+3. If no HF token is found, `speaker` fields are omitted
+
 **Audio formats:**
 - PCM: raw signed 16-bit little-endian samples at `sample_rate` Hz
 - Opus: standard Opus packets (requires `opuslib` Python package and system `libopus`)
+
+**Opus codec setup:**
+```bash
+# macOS
+brew install opus
+# Ubuntu/Debian
+apt-get install libopus0
+
+cd server/backend && uv sync --extra omi
+```
 
 **Configuration** (`server/config.yaml` `ws_stt` section):
 ```yaml
@@ -1591,8 +1612,58 @@ ws_stt:
 ```
 
 **Manual test scripts** (in `scripts/`):
-- `test_ws_stt.py` — comprehensive test covering PCM/Opus, save-to-notebook, multi-connection stitching
-- `test_omi_websocket.py` — lightweight Omi device simulation test
+- `test_ws_stt.py` — comprehensive test: PCM streaming, `save_to_notebook`, `speaker_labels`, multi-connection stitching
+- `test_omi_websocket.py` — simulates an Omi device: PCM streaming, `speaker_labels`, dynamic receive timeout
+
+```bash
+# Run against all files in samples/input/
+python scripts/test_ws_stt.py
+
+# Request speaker diarization after CloseStream
+python scripts/test_ws_stt.py --speaker-labels samples/input/1min_test.wav
+
+# Save to Audio Notebook
+python scripts/test_ws_stt.py --save-to-notebook samples/input/1min_test.wav
+
+# Remote server
+python scripts/test_ws_stt.py --server ws://10.0.1.90:9786 --language en
+```
+
+**Getting an API token** (with the server running):
+```bash
+python3 -c "
+import json, pathlib
+tokens = json.loads(pathlib.Path.home().joinpath(
+    'Library/Application Support/TranscriptionSuite/data/tokens/tokens.json'
+).read_text())
+for t in tokens['tokens']:
+    if t.get('is_admin') and not t.get('is_revoked'):
+        print(t['token'])
+        break
+"
+```
+
+#### Omi Device Integration
+
+This endpoint is compatible with the [Omi External Custom STT protocol](https://docs.omi.me/developer/backend/custom-stt). Configure your Omi device to point at `ws://<host>:9786/ws/stt`.
+
+**What Omi sends:**
+
+| Message | Format | Description |
+|---|---|---|
+| Audio frames | Binary | Raw audio bytes (Opus 16 kHz by default) |
+| `{"type": "CloseStream"}` | JSON | End of audio stream |
+
+**What this server sends back:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `text` | `string` | Yes | Transcribed text |
+| `speaker` | `string` | No | Speaker label (`SPEAKER_00`, `SPEAKER_01`, …) — only when `speaker_labels=true` and HF token is set |
+| `start` | `float` | No | Start time in seconds |
+| `end` | `float` | No | End time in seconds |
+
+Note: the response is `{"segments": [...]}` — a top-level object, not a bare array.
 
 ---
 

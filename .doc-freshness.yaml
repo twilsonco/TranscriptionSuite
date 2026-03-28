@@ -63,3 +63,8 @@ documents:
         label: "Server Dependencies"
         sources:
           - server/backend/pyproject.toml
+      - anchor: "75-websocket-stt-endpoint"
+        label: "WebSocket STT Endpoint"
+        sources:
+          - server/backend/api/routes/ws_stt.py
+          - server/config.yaml
